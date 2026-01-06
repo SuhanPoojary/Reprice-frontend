@@ -22,7 +22,7 @@ export default function NotFound() {
             <Link to="/">
               <Button>Back to Home</Button>
             </Link>
-            <Link to="/sell-phone">
+            <Link to="/login">
               <Button variant="outline">Sell Your Phone</Button>
             </Link>
           </div>

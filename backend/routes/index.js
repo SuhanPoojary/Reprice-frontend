@@ -13,7 +13,7 @@ router.use("/agent", agentRoutes);
 router.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    message: "CashNow API is running",
+    message: "MobileTrade API is running",
     timestamp: new Date().toISOString(),
   });
 });

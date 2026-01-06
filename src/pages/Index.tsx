@@ -125,20 +125,7 @@ export default function Index() {
                 className="flex flex-wrap gap-4 mt-4"
                 variants={itemVariants}
               >
-                <Link to="/sell-phone">
-                  <Button className="bg-primary text-primary-foreground hover:brightness-95">
-                    Sell Now
-                    <ArrowRight className="ml-2" />
-                  </Button>
-                </Link>
-                <Link to="/agent/register">
-                  <Button
-                    variant="outline"
-                    className="border-primary text-primary hover:bg-primary/10"
-                  >
-                    Become an Agent
-                  </Button>
-                </Link>
+            
               </motion.div>
             </motion.div>
 
@@ -204,7 +191,7 @@ export default function Index() {
                       </motion.li>
                     ))}
                   </motion.ul>
-                  <Link to="/sell-phone">
+                  <Link to="/login">
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
@@ -263,7 +250,7 @@ export default function Index() {
                       </motion.li>
                     ))}
                   </motion.ul>
-                  <Link to="/agent/register">
+                  <Link to="/login">
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
@@ -303,7 +290,7 @@ export default function Index() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-4xl font-bold mb-4">Why Choose CashNow?</h2>
+            <h2 className="text-4xl font-bold mb-4">Why Choose MobileTrade?</h2>
             <p className="text-gray-600 max-w-2xl mx-auto text-lg">
               The most trusted platform for buying and selling used mobile
               phones in India
@@ -558,7 +545,7 @@ export default function Index() {
             viewport={{ once: true }}
             transition={{ delay: 0.4 }}
           >
-            <Link to="/agent/register">
+            <Link to="/login">
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -669,7 +656,7 @@ export default function Index() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Link to="/sell-phone">
+                <Link to="/login">
                   <Button
                     size="lg"
                     className="bg-primary text-primary-foreground hover:brightness-95 w-full sm:w-auto"
@@ -684,7 +671,7 @@ export default function Index() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Link to="/agent/register">
+                <Link to="/login">
                   <Button
                     size="lg"
                     variant="outline"

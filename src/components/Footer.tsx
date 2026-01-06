@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Facebook, Instagram, Phone, Twitter } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export function Footer() {
   return (
@@ -11,7 +12,7 @@ export function Footer() {
           <div>
             <div className="flex items-center mb-4">
               <Phone className="h-6 w-6 text-primary mr-2" />
-              <span className="text-xl font-bold text-primary">CashNow</span>
+              <span className="text-xl font-bold text-primary">MobileTrade</span>
             </div>
             <p className="mb-4 text-gray-600">
               MobileTrade is India's leading platform for selling used
@@ -47,12 +48,24 @@ export function Footer() {
             </h3>
             <ul className="space-y-2">
               <li>
-                <Link
-                  to="/sell-phone"
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  Sell Phone
-                </Link>
+                {(() => {
+                  const { isLoggedIn } = useAuth();
+                  return isLoggedIn ? (
+                    <Link
+                      to="/sell"
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      Sell Phone
+                    </Link>
+                  ) : (
+                    <span
+                      className="text-gray-500 cursor-not-allowed opacity-60"
+                      title="Login to access selling"
+                    >
+                      Sell Phone
+                    </span>
+                  );
+                })()}
               </li>
               <li>
                 <Link

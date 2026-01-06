@@ -1,7 +1,7 @@
 {
   "name": "cashnow-backend",
   "version": "1.0.0",
-  "description": "Backend API for CashNow phone selling platform",
+  "description": "Backend API for MobileTrade phone selling platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

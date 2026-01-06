@@ -428,7 +428,7 @@ export default function Checkout() {
                         </Button>
                         <div className="text-center">
                           <Link
-                            to="/sell-phone"
+                            to="/login"
                             className="text-sm text-gray-500 hover:text-blue-600 inline-flex items-center transition-colors"
                           >
                             <ArrowLeft size={14} className="mr-1" />

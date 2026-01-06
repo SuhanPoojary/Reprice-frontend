@@ -82,6 +82,7 @@ export default function Login() {
           }
         );
 
+        setIsOpen(false);
         navigate("/agent/dashboard");
       },
       () => {
@@ -89,7 +90,9 @@ export default function Login() {
       }
     );
   } else {
-    navigate("/sell-phone");
+    // For customers, close the dialog and go to the Sell page
+    setIsOpen(false);
+    navigate("/sell");
   }
 }
 
@@ -124,7 +127,7 @@ export default function Login() {
                     <h2 className="text-3xl font-bold mb-4">
                       {userType === "agent"
                         ? "Agent Portal"
-                        : "Welcome to CashNow"}
+                        : "Welcome to MobileTrade"}
                     </h2>
                     <p className="text-lg text-blue-100">
                       {userType === "agent"

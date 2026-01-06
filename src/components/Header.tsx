@@ -49,16 +49,25 @@ export function Header() {
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <Phone className="h-6 w-6 text-primary mr-2" />
-              <span className="text-xl font-bold text-primary">CashNow</span>
+              <span className="text-xl font-bold text-primary">MobileTrade</span>
             </Link>
 
             <nav className="hidden md:flex items-center space-x-6 ml-10">
-              <Link
-                to="/sell-phone"
-                className="text-sm font-medium hover:text-primary transition-colors"
-              >
-                Sell Phone
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  to="/sell"
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
+                  Sell Phone
+                </Link>
+              ) : (
+                <span
+                  className="text-sm font-medium text-gray-400 cursor-not-allowed opacity-60"
+                  title="Login to access selling"
+                >
+                  Sell Phone
+                </span>
+              )}
               <Link
                 to="/how-it-works"
                 className="text-sm font-medium hover:text-primary transition-colors"
@@ -131,7 +140,7 @@ export function Header() {
                 </Button>
 
                 {/* Sell Now button */}
-                <Link to="/sell-phone">
+                <Link to="/login">
                   <Button className="bg-primary text-primary-foreground hover:brightness-95 hidden md:inline-flex">
                     Sell Now
                   </Button>
@@ -158,12 +167,21 @@ export function Header() {
               </SheetTrigger>
               <SheetContent side="right">
                 <div className="grid gap-6 py-6">
-                  <Link
-                    to="/sell-phone"
-                    className="text-base font-medium hover:text-blue-600 transition-colors"
-                  >
-                    Sell Phone
-                  </Link>
+                  {isLoggedIn ? (
+                    <Link
+                      to="/sell"
+                      className="text-base font-medium hover:text-blue-600 transition-colors"
+                    >
+                      Sell Phone
+                    </Link>
+                  ) : (
+                    <div
+                      className="text-base font-medium text-gray-400 cursor-not-allowed opacity-60"
+                      title="Login to access selling"
+                    >
+                      Sell Phone
+                    </div>
+                  )}
                   <Link
                     to="/how-it-works"
                     className="text-base font-medium hover:text-blue-600 transition-colors"

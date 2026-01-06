@@ -40,7 +40,7 @@ const App = () => (
             <Routes>
               {/* Main pages */}
               <Route path="/" element={<Index />} />
-              <Route path="/sell-phone" element={<SellPhone />} />
+              <Route path="/sell" element={<SellPhone />} />
               <Route path="/sell/:phoneId" element={<PhoneDetail />} />
 
               {/* Customer routes */}
@@ -48,7 +48,7 @@ const App = () => (
 
               {/* Agent routes */}
               {/* <Route path="/agent/login" element={<AgentLogin />} />
-            <Route path="/agent/register" element={<AgentLogin />} /> */}
+            <Route path="/login" element={<AgentLogin />} /> */}
 
               {/* Lazy loaded pages */}
               <Route path="/login" element={<Login />} />
