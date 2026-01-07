@@ -9,6 +9,8 @@ import PhoneDetail from "./pages/PhoneDetail";
 import { lazy, Suspense } from "react";
 import { AuthProvider } from "@/context/AuthContext";
 import OrderDetails from "@/pages/OrderDetails";
+import MyOrders from "@/pages/MyOrders";
+
 
 
 
@@ -64,6 +66,8 @@ const App = () => (
               <Route path="/agent/login" element={<AgentLogin />} />
               
               <Route path="/order/:orderId" element={<OrderDetails />} />
+              <Route path="/my-orders" element={<MyOrders />} />
+
               <Route path="/agent/dashboard" element={<AgentDashboard />} />
 
               {/* Catch all */}

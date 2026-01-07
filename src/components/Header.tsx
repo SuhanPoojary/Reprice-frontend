@@ -68,6 +68,15 @@ export function Header() {
                   Sell Phone
                 </span>
               )}
+              {isLoggedIn && user?.role === "customer" && (
+  <Link
+    to="/my-orders"
+    className="text-sm font-medium hover:text-primary transition-colors"
+  >
+    My Orders
+  </Link>
+)}
+
               <Link
                 to="/how-it-works"
                 className="text-sm font-medium hover:text-primary transition-colors"
@@ -182,6 +191,15 @@ export function Header() {
                       Sell Phone
                     </div>
                   )}
+                  {isLoggedIn && user?.role === "customer" && (
+  <Link
+    to="/my-orders"
+    className="text-base font-medium hover:text-blue-600 transition-colors"
+  >
+    My Orders
+  </Link>
+)}
+
                   <Link
                     to="/how-it-works"
                     className="text-base font-medium hover:text-blue-600 transition-colors"

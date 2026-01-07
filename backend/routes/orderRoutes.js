@@ -19,8 +19,6 @@ router.post("/create", authenticateToken, async (req, res) => {
       paymentMethod,
     } = req.body;
 
-    console.log('Received timeSlot:', timeSlot);
-
     if (latitude == null || longitude == null) {
       return res.status(400).json({
         success: false,
@@ -35,15 +33,13 @@ router.post("/create", authenticateToken, async (req, res) => {
        (customer_id, full_address, city, state, pincode, latitude, longitude)
        VALUES ($1,$2,$3,$4,$5,$6,$7)
        RETURNING id`,
-      [customerId, address, city, state || '', pincode, latitude, longitude]
+      [customerId, address, city, state || "", pincode, latitude, longitude]
     );
 
     const addressId = addressResult.rows[0].id;
 
-    // ✅ ADD: Generate order number
     const orderNumber = `MOB${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-    // ✅ UPDATED: include order_number column & value
     const orderResult = await pool.query(
       `INSERT INTO orders
        (customer_id, address_id, phone_model, phone_variant, phone_condition,
@@ -60,11 +56,9 @@ router.post("/create", authenticateToken, async (req, res) => {
         pickupDate,
         paymentMethod,
         timeSlot,
-        orderNumber, // ✅ added
+        orderNumber,
       ]
     );
-
-    console.log('Created order:', orderResult.rows[0]);
 
     res.status(201).json({
       success: true,
@@ -72,15 +66,14 @@ router.post("/create", authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error("CREATE ORDER ERROR:", err);
-    console.error("Request body:", req.body);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: err.message 
+      message: err.message,
     });
   }
 });
 
-// ASSIGN ORDER TO AGENT (Start Pickup)
+// ASSIGN ORDER TO AGENT
 router.patch("/:id/assign", authenticateToken, async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -113,7 +106,79 @@ router.patch("/:id/assign", authenticateToken, async (req, res) => {
   }
 });
 
-// GET SINGLE ORDER DETAILS
+// COMPLETE ORDER
+router.patch("/:id/complete", authenticateToken, async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const agentId = req.user.id;
+
+    const result = await pool.query(
+      `
+      UPDATE orders
+      SET status = 'completed'
+      WHERE id = $1
+        AND agent_id = $2
+        AND status = 'in-progress'
+      RETURNING *
+      `,
+      [orderId, agentId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Order not in progress or not assigned to you",
+      });
+    }
+
+    res.json({
+      success: true,
+      order: result.rows[0],
+    });
+  } catch (err) {
+    console.error("COMPLETE ORDER ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to complete order",
+    });
+  }
+});
+
+// ✅ MOVE THIS UP — GET MY ORDERS
+router.get("/my", authenticateToken, async (req, res) => {
+  try {
+    const customerId = req.user.id;
+
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        order_number,
+        phone_model,
+        price,
+        status,
+        created_at
+      FROM orders
+      WHERE customer_id = $1
+      ORDER BY created_at DESC
+      `,
+      [customerId]
+    );
+
+    res.json({
+      success: true,
+      orders: result.rows,
+    });
+  } catch (err) {
+    console.error("GET MY ORDERS ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+    });
+  }
+});
+
+// GET SINGLE ORDER DETAILS — MUST BE LAST
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -143,7 +208,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
         WHERE o.id = $1 AND o.customer_id = $2
       `;
       params = [orderId, userId];
-    } else if (userType === "agent") {
+    } else {
       query = `
         SELECT 
           o.*,
@@ -186,44 +251,5 @@ router.get("/:id", authenticateToken, async (req, res) => {
     });
   }
 });
-
-// COMPLETE ORDER (Finish Pickup)
-router.patch("/:id/complete", authenticateToken, async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const agentId = req.user.id;
-
-    const result = await pool.query(
-      `
-      UPDATE orders
-      SET status = 'completed'
-      WHERE id = $1
-        AND agent_id = $2
-        AND status = 'in-progress'
-      RETURNING *
-      `,
-      [orderId, agentId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(409).json({
-        success: false,
-        message: "Order not in progress or not assigned to you",
-      });
-    }
-
-    res.json({
-      success: true,
-      order: result.rows[0],
-    });
-  } catch (err) {
-    console.error("COMPLETE ORDER ERROR:", err);
-    res.status(500).json({
-      success: false,
-      message: "Failed to complete order",
-    });
-  }
-});
-
 
 module.exports = router;
