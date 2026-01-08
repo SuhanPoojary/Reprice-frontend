@@ -47,19 +47,15 @@ interface OrderDetails {
 }
 
 export default function OrderDetails() {
-  // ✅ ALL HOOKS AT THE TOP
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { token, isLoading } = useAuth();
-
+  const { token } = useAuth();
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ useEffect ALWAYS EXISTS
   useEffect(() => {
-    if (isLoading || !token) return;
     fetchOrderDetails();
-  }, [orderId, token, isLoading]);
+  }, [orderId]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -84,6 +80,7 @@ export default function OrderDetails() {
       setLoading(false);
     }
   };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -131,7 +128,7 @@ export default function OrderDetails() {
 
   const handleShare = () => {
     const shareText = `My order ${order?.order_number} for ${order?.phone_model} is ${order?.status}. Track it here: ${window.location.href}`;
-
+    
     if (navigator.share) {
       navigator.share({
         title: "Order Details",
@@ -166,7 +163,8 @@ export default function OrderDetails() {
       </div>
     );
   }
- return (
+
+  return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <Header />
 

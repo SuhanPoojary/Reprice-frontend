@@ -1,3 +1,4 @@
+
 import {
   createContext,
   useContext,
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     } catch (error) {
       console.warn("Backend not available, using mock authentication:", error);
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       if (identifier && password.length >= 4) {
@@ -188,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     } catch (error) {
       console.warn("Backend not available, using mock signup:", error);
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       if (name && phone && password.length >= 4) {

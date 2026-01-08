@@ -16,6 +16,28 @@ import { Search, ArrowRight, Heart } from "lucide-react";
 import { Link } from "react-router-dom";
 import Autoplay from "embla-carousel-autoplay";
 
+console.log("🔥 THIS SellPhone FILE IS LOADED");
+
+/* ================= TYPES ================= */
+
+interface BackendPhone {
+  brand: string;
+  model: string;
+  variant?: string;
+  price: number;
+  image?: string;
+}
+
+interface Phone {
+  id: string;
+  name: string;
+  brand: string;
+  image: string;
+  maxPrice: number;
+}
+
+/* ================= DATA ================= */
+
 // Sample data for brands
 const BRANDS = [
   {
@@ -76,7 +98,7 @@ const SLIDER_IMAGES = [
 ];
 
 // Sample data for popular phones
-const POPULAR_PHONES = [
+const POPULAR_PHONES: Phone[] = [
   {
     id: "iphone-13-pro",
     name: "iPhone 13 Pro",
@@ -135,20 +157,63 @@ const POPULAR_PHONES = [
   },
 ];
 
+/* ================= COMPONENT ================= */
+
 export default function SellPhone() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredPhones, setFilteredPhones] = useState(POPULAR_PHONES);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [filteredPhones, setFilteredPhones] =
+    useState<Phone[]>(POPULAR_PHONES);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const filtered = POPULAR_PHONES.filter(
-      (phone) =>
-        phone.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        phone.brand.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    setFilteredPhones(filtered);
-  };
 
+    if (!searchQuery.trim()) {
+      setFilteredPhones(POPULAR_PHONES);
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      const res = await fetch(
+        `http://localhost:8000/search-phones?q=${encodeURIComponent(
+          searchQuery
+        )}`
+      );
+
+      const data: BackendPhone[] = await res.json();
+      console.log("BACKEND RAW DATA:", data);
+
+      const mapped = data.map((item, idx) => ({
+  id:
+    item.model
+      .toLowerCase()
+      .replace(/[\s/]+/g, "-") + `-${idx}`,
+
+  name: `${item.brand} ${item.model}`,
+
+  brand: item.brand,
+
+  variant: item.variant ?? "N/A",
+
+  condition: "Good", // default until inspection
+
+  price: item.price,        // 🔥 ADD THIS
+  maxPrice: item.price,     // optional but safe
+
+  image: item.image || "",
+}));
+
+
+
+      setFilteredPhones(mapped);
+    } catch (err) {
+      console.error("Search failed", err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -239,6 +304,7 @@ export default function SellPhone() {
 
                           <Link
                             to={`/sell/${phone.id}`}
+                            state={{ phoneData: phone }}
                             className="flex flex-col h-full"
                           >
                             {/* Product Image: fixed height + robust fallback + object-cover */}
@@ -249,7 +315,7 @@ export default function SellPhone() {
                                   `/assets/phones/${phone.id}.png`
                                 }
                                 alt={phone.name}
-                                className="w-full h-full object-cover drop-shadow-lg group-hover:scale-110 transition-transform duration-300"
+                                className="w-full h-full object-contain drop-shadow-lg group-hover:scale-110 transition-transform duration-300"
                                 onError={(e) => {
                                   const img = e.target as HTMLImageElement;
                                   if (img.dataset.attempt === "1") {
@@ -281,7 +347,7 @@ export default function SellPhone() {
                                     size="sm"
                                     className="bg-gray-900 hover:bg-gray-800 text-white rounded-full px-4 py-1 text-xs font-medium"
                                   >
-                                    Buy
+                                    Sell
                                   </Button>
                                 </div>
                               </div>

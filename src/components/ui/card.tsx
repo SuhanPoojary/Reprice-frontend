@@ -32,4 +32,7 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 ));
 CardFooter.displayName = 'CardFooter';
 
+// If you have a button in your card, change its label from 'Buy' to 'Sell' in the parent component that uses CardFooter.
+// This file only provides the Card UI structure. The button label should be updated in the card usage (e.g., FeaturedPhones, PhoneCard, etc.).
+
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };

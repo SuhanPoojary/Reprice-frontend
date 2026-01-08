@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext"; 
+
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -73,8 +74,10 @@ const getCurrentLocation = (): Promise<{
 };
 
 
+
 export default function Checkout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { token } = useAuth(); 
   const [paymentMethod, setPaymentMethod] = useState("upi");
   const [step, setStep] = useState(1);
@@ -90,13 +93,39 @@ export default function Checkout() {
     pickupDate: "",
   });
 
-  const phoneData = {
-    id: "iphone-13-pro",
-    name: "iPhone 13 Pro",
-    variant: "256GB",
-    condition: "Good",
-    price: 40000,
-  };
+  // Use phoneData from location.state if available, else fallback
+  const locationState = location.state as any;
+
+ const passedPhoneData = locationState?.phoneData;
+
+ const phoneData = passedPhoneData
+  ? {
+      id: passedPhoneData.id,
+      name: passedPhoneData.name,
+      brand: passedPhoneData.brand,
+      variant: passedPhoneData.variant ?? "N/A",
+      condition: passedPhoneData.condition ?? "Good",
+      price:
+        passedPhoneData.price ??
+        passedPhoneData.maxPrice ??
+        0,
+      image:
+        passedPhoneData.image && passedPhoneData.image.trim() !== ""
+          ? passedPhoneData.image
+          : `https://placehold.co/200x200?text=${encodeURIComponent(
+              passedPhoneData.name
+            )}`,
+    }
+  : {
+      // fallback ONLY if navigation state is missing
+      id: "iphone-13-pro",
+      name: "iPhone 13 Pro",
+      brand: "Apple",
+      variant: "256GB",
+      condition: "Good",
+      price: 40000,
+      image: "/assets/phones/iphone-13-pro.png",
+    };
 
   const handleSubmitAddress = (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,6 +180,9 @@ export default function Checkout() {
     setIsSubmitting(false);
   }
 };
+
+console.log("CHECKOUT STATE:", location.state);
+
 
   const stepIcons = [
     { icon: MapPin, label: "Pickup Details" },
@@ -784,10 +816,15 @@ export default function Checkout() {
                     <div className="flex items-center mb-4 p-3 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl">
                       <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm">
                         <img
-                          src={`https://placehold.co/200x200?text=${phoneData.name}`}
-                          alt={phoneData.name}
-                          className="max-h-14"
-                        />
+  src={phoneData.image}
+  alt={phoneData.name}
+  className="max-h-14 object-contain"
+  onError={(e) => {
+    (e.target as HTMLImageElement).src =
+      `https://placehold.co/200x200?text=${encodeURIComponent(phoneData.name)}`;
+  }}
+/>
+
                       </div>
                       <div>
                         <h4 className="font-semibold text-gray-900">
