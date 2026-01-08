@@ -177,7 +177,7 @@ export default function SellPhone() {
 
     try {
       const res = await fetch(
-        `http://localhost:8000/search-phones?q=${encodeURIComponent(
+        `https://reprice-ml3.onrender.com/search-phones?q=${encodeURIComponent(
           searchQuery
         )}`
       );

@@ -108,7 +108,7 @@ export default function PhoneDetail() {
   const fetchPriceFromBackend = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/calculate-price", {
+      const response = await fetch("https://reprice-ml3.onrender.com/calculate-price", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
