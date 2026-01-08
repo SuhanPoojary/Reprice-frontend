@@ -52,7 +52,7 @@ export default function AgentDashboard() {
       async (position) => {
         try {
           await fetch(
-            `${import.meta.env.VITE_API_URL}/agent/update-location`,
+            `https://reprice-backend-a5mp.onrender.com/api/agent/update-location`,
             {
               method: "POST",
               headers: {
@@ -81,7 +81,7 @@ export default function AgentDashboard() {
       const endpoint =
         view === "nearby" ? "/agent/nearby-orders" : "/agent/my-pickups";
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
+      const res = await fetch(`https://reprice-backend-a5mp.onrender.com/api${endpoint}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -110,7 +110,7 @@ export default function AgentDashboard() {
   const startPickup = async (orderId: string) => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/orders/${orderId}/assign`,
+        `https://reprice-backend-a5mp.onrender.com/api/orders/${orderId}/assign`,
         {
           method: "PATCH",
           headers: {
@@ -136,7 +136,7 @@ export default function AgentDashboard() {
   const completePickup = async (orderId: string) => {
     try {
       await fetch(
-        `${import.meta.env.VITE_API_URL}/orders/${orderId}/complete`,
+        `https://reprice-backend-a5mp.onrender.com/api/orders/${orderId}/complete`,
         {
           method: "PATCH",
           headers: {
@@ -158,7 +158,7 @@ export default function AgentDashboard() {
   const cancelPickup = async (orderId: string) => {
   try {
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/orders/${orderId}/cancel`,
+      `https://reprice-backend-a5mp.onrender.com/api/orders/${orderId}/cancel`,
       {
         method: "PATCH",
         headers: {

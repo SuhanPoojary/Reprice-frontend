@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
 
 interface OrderDetails {
   id: string;

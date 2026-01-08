@@ -68,7 +68,7 @@ export default function Login() {
         const token = localStorage.getItem("token");
 
         await fetch(
-          `${import.meta.env.VITE_API_URL}/agent/update-location`,
+          `https://reprice-backend-a5mp.onrender.com/api/agent/update-location`,
           {
             method: "POST",
             headers: {

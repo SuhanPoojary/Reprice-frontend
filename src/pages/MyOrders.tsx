@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
 
 interface Order {
   id: number;
