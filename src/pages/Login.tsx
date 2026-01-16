@@ -110,8 +110,9 @@ export default function Login() {
 
       <main className="flex-grow flex items-center justify-center py-12 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         <Dialog open={isOpen} onOpenChange={handleClose}>
-          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] p-0 gap-0 overflow-hidden border-0 shadow-2xl">
-            <div className="grid md:grid-cols-2 gap-0 h-full overflow-y-auto">
+          <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden border-0 shadow-2xl">
+
+            <div className="grid md:grid-cols-2 gap-0 min-h-0">
               {/* Left side - Image */}
               <div className="hidden md:block relative bg-gradient-to-br from-blue-600 to-indigo-700">
                 <div className="absolute inset-0 bg-[url('/images/auth.jpg')] bg-cover bg-center opacity-20"></div>
@@ -192,7 +193,8 @@ export default function Login() {
               </div>
 
               {/* Right side - Form */}
-              <div className="p-8 bg-white">
+              <div className="p-8 bg-white overflow-y-auto max-h-[90vh]">
+
                 <DialogHeader className="mb-6">
                   <DialogTitle className="text-2xl font-bold text-center">
                     {authMode === "login" ? "Welcome Back!" : "Create Account"}
