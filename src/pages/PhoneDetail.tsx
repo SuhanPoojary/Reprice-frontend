@@ -17,11 +17,24 @@ import {
 } from "lucide-react";
 
 const STEPS = [
-  { id: 1, name: "RAM", icon: HardDrive },
-  { id: 2, name: "Storage", icon: HardDrive },
-  { id: 3, name: "Condition", icon: Smartphone },
-  { id: 4, name: "Final Quote", icon: DollarSign },
+  { id: 1, name: "Variant", icon: HardDrive },
+  { id: 2, name: "Condition", icon: Smartphone },
+  { id: 3, name: "Final Quote", icon: DollarSign },
 ];
+
+function formatVariant(variant: unknown): string | undefined {
+  if (typeof variant !== "string") return undefined;
+  const raw = variant.trim();
+  if (!raw || raw === "N/A") return undefined;
+
+  // Prefer a compact display like "4/64" when input looks like "4GB/64GB".
+  const compactGb = raw
+    .replace(/\s+/g, "")
+    .match(/^(\d+)(GB)?\/(\d+)(GB)?$/i);
+  if (compactGb) return `${compactGb[1]}/${compactGb[3]}`;
+
+  return raw;
+}
 
 export default function PhoneDetail() {
   const location = useLocation();
@@ -29,8 +42,6 @@ export default function PhoneDetail() {
   const passedPhone = location.state?.phoneData;
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedRam, setSelectedRam] = useState("standard");
-  const [selectedStorage, setSelectedStorage] = useState("standard");
   const [selectedScreenCondition, setSelectedScreenCondition] = useState("");
   const [deviceTurnsOn, setDeviceTurnsOn] = useState<string>("");
   const [hasOriginalBox, setHasOriginalBox] = useState<string>("");
@@ -58,13 +69,12 @@ export default function PhoneDetail() {
     id: passedPhone.id,
     name: passedPhone.name,
     brand: passedPhone.brand,
+    variant: passedPhone.variant,
     // ✅ USE THE REAL IMAGE FROM CSV/API
     image: passedPhone.image || `https://placehold.co/200x200/3b82f6/white?text=${encodeURIComponent(passedPhone.brand + ' ' + passedPhone.name)}`,
     releaseYear: 2023,
     description: `Sell your ${passedPhone.name} for the best price.`,
     basePrice: passedPhone.maxPrice || 0,
-    ramOptions: [{ id: "standard", name: "Standard", priceAdjustment: 0 }],
-    storageOptions: [{ id: "standard", name: "Standard", priceAdjustment: 0 }],
     screenConditions: [
       {
         id: "good",
@@ -100,7 +110,7 @@ export default function PhoneDetail() {
   };
 
   useEffect(() => {
-    if (currentStep === 4) {
+    if (currentStep === 3) {
       fetchPriceFromBackend();
     }
   }, [currentStep]);
@@ -179,9 +189,8 @@ export default function PhoneDetail() {
   };
 
   const canProceed = () => {
-    if (currentStep === 1) return true; // Auto-proceed
-    if (currentStep === 2) return true; // Auto-proceed
-    if (currentStep === 3)
+    if (currentStep === 1) return true;
+    if (currentStep === 2)
       return (
         selectedScreenCondition !== "" &&
         deviceTurnsOn !== "" &&
@@ -228,24 +237,14 @@ export default function PhoneDetail() {
                   {currentStep === 1 && (
                     <>
                       <h1 className="text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
-                        What is your RAM?
+                        Confirm your phone variant
                       </h1>
                       <p className="text-gray-600 text-lg">
-                        Select the RAM capacity
+                        Variant is auto-detected for this model
                       </p>
                     </>
                   )}
                   {currentStep === 2 && (
-                    <>
-                      <h1 className="text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
-                        Storage capacity?
-                      </h1>
-                      <p className="text-gray-600 text-lg">
-                        Select your device storage
-                      </p>
-                    </>
-                  )}
-                  {currentStep === 3 && (
                     <>
                       <h1 className="text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
                         Device Condition?
@@ -255,7 +254,7 @@ export default function PhoneDetail() {
                       </p>
                     </>
                   )}
-                  {currentStep === 4 && (
+                  {currentStep === 3 && (
                     <>
                       <h1 className="text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
                         Your Final Quote
@@ -284,6 +283,16 @@ export default function PhoneDetail() {
                         <p className="text-sm text-gray-600">
                           {phone.brand} • {phone.releaseYear}
                         </p>
+                        {(() => {
+  const variant = formatVariant(phone.variant);
+  if (!variant) return null;
+  return (
+    <p className="text-sm text-gray-600 mt-1">
+      {phone.brand.toUpperCase()} : {variant}
+    </p>
+  );
+})()}
+
                         <p className="text-sm font-semibold text-blue-600 mt-1">
                           Base: ₹
                           {(apiBasePrice !== null
@@ -298,7 +307,7 @@ export default function PhoneDetail() {
               </div>
 
               <div>
-                {currentStep > 1 && currentStep < 4 && (
+                {currentStep > 1 && currentStep < STEPS.length && (
                   <Button
                     variant="outline"
                     onClick={() => setCurrentStep(currentStep - 1)}
@@ -313,84 +322,25 @@ export default function PhoneDetail() {
             {/* Right Side - Options Panel */}
             <div className="flex flex-col justify-center">
               <div className="max-w-xl mx-auto w-full space-y-4">
-                {/* Step 1: RAM Selection */}
+                {/* Step 1: Variant (auto-detected) */}
                 {currentStep === 1 && (
-                  <RadioGroup
-                    value={selectedRam}
-                    onValueChange={setSelectedRam}
-                    className="space-y-4"
-                  >
-                    {phone.ramOptions.map((ram) => (
-                      <div key={ram.id}>
-                        <RadioGroupItem
-                          value={ram.id}
-                          id={`ram-${ram.id}`}
-                          className="peer sr-only"
-                        />
-                        <Label
-                          htmlFor={`ram-${ram.id}`}
-                          className="flex items-center gap-4 border-2 rounded-2xl p-5 cursor-pointer peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 hover:bg-white/80 bg-white/60 backdrop-blur transition-all hover:shadow-lg"
-                        >
-                          <div
-                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                              selectedRam === ram.id
-                                ? "border-blue-600 bg-blue-600"
-                                : "border-gray-300"
-                            }`}
-                          >
-                            {selectedRam === ram.id && (
-                              <div className="w-3 h-3 rounded-full bg-white" />
-                            )}
+                  <Card className="bg-white/60 backdrop-blur border-0 shadow-lg">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3">
+                        <HardDrive className="h-5 w-5 text-blue-600" />
+                        <div>
+                          <div className="text-sm text-gray-500">Variant</div>
+                          <div className="font-semibold text-gray-900">
+                            {formatVariant(phone.variant) ?? "N/A"}
                           </div>
-                          <span className="font-semibold text-lg flex-grow">
-                            {ram.name}
-                          </span>
-                        </Label>
+                        </div>
                       </div>
-                    ))}
-                  </RadioGroup>
+                    </CardContent>
+                  </Card>
                 )}
 
-                {/* Step 2: Storage Selection */}
+                {/* Step 2: Condition Assessment */}
                 {currentStep === 2 && (
-                  <RadioGroup
-                    value={selectedStorage}
-                    onValueChange={setSelectedStorage}
-                    className="space-y-4"
-                  >
-                    {phone.storageOptions.map((storage) => (
-                      <div key={storage.id}>
-                        <RadioGroupItem
-                          value={storage.id}
-                          id={`storage-${storage.id}`}
-                          className="peer sr-only"
-                        />
-                        <Label
-                          htmlFor={`storage-${storage.id}`}
-                          className="flex items-center gap-4 border-2 rounded-2xl p-5 cursor-pointer peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 hover:bg-white/80 bg-white/60 backdrop-blur transition-all hover:shadow-lg"
-                        >
-                          <div
-                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                              selectedStorage === storage.id
-                                ? "border-blue-600 bg-blue-600"
-                                : "border-gray-300"
-                            }`}
-                          >
-                            {selectedStorage === storage.id && (
-                              <div className="w-3 h-3 rounded-full bg-white" />
-                            )}
-                          </div>
-                          <span className="font-semibold text-lg flex-grow">
-                            {storage.name}
-                          </span>
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                )}
-
-                {/* Step 3: Condition Assessment */}
-                {currentStep === 3 && (
                   <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                     {/* Screen Condition */}
                     <div>
@@ -600,8 +550,8 @@ export default function PhoneDetail() {
                   </div>
                 )}
 
-                {/* Step 4: Final Quote */}
-                {currentStep === 4 && (
+                {/* Step 3: Final Quote */}
+                {currentStep === 3 && (
                   <div className="space-y-6">
                     {/* Price Card */}
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 text-white">
@@ -675,20 +625,23 @@ export default function PhoneDetail() {
                     </div>
 
                     <Link
-  to="/checkout"
-  state={{
-    phoneData: {
-      id: phone.id,
-      name: phone.name,
-      brand: phone.brand,
-      variant: selectedStorage,      // or passedPhone.variant
-      condition: selectedScreenCondition || "Good",
-      price: apiPrice ?? phone.basePrice,
-      maxPrice: phone.basePrice,
-      image: phone.image,
-    },
-  }}
->
+                      to="/checkout"
+                      state={{
+                        phoneData: {
+                          id: phone.id,
+                          name: phone.name,
+                          brand: phone.brand,
+                          variant: phone.variant ?? "N/A",
+                          condition:
+                            phone.screenConditions.find(
+                              (s) => s.id === selectedScreenCondition
+                            )?.name ?? "Good",
+                          price: apiPrice ?? phone.basePrice,
+                          maxPrice: phone.basePrice,
+                          image: phone.image,
+                        },
+                      }}
+                    >
 
                       <Button className="w-full h-14 text-lg rounded-2xl">
                         Proceed to Sell <ArrowRight className="ml-2" />
@@ -697,8 +650,8 @@ export default function PhoneDetail() {
                   </div>
                 )}
 
-                {/* Next Button for steps 1-3 */}
-                {currentStep < 4 && (
+                {/* Next Button for steps 1-2 */}
+                {currentStep < STEPS.length && (
                   <div className="flex justify-end pt-4">
                     <Button
                       onClick={() => setCurrentStep(currentStep + 1)}

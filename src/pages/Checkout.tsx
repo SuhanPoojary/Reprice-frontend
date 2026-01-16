@@ -685,6 +685,44 @@ console.log("CHECKOUT STATE:", location.state);
                             </div>
                           )}
                         </div>
+
+                        <div
+                          className={`border-2 rounded-xl p-4 transition-all cursor-pointer ${
+                            paymentMethod === "cash"
+                              ? "border-blue-500 bg-blue-50/50 shadow-md"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <RadioGroupItem
+                              value="cash"
+                              id="cash"
+                              className="text-blue-600"
+                            />
+                            <Label
+                              htmlFor="cash"
+                              className="flex-1 ml-3 cursor-pointer"
+                            >
+                              <div className="font-semibold text-gray-900">
+                                Cash on Pickup
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Pay in cash after device verification
+                              </div>
+                            </Label>
+
+                            <div className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                              Popular
+                            </div>
+                          </div>
+
+                          {paymentMethod === "cash" && (
+                            <div className="mt-4 pl-8 text-sm text-gray-600 animate-in slide-in-from-top-2 duration-200">
+                              💡 Our executive will verify your device and pay
+                              you in cash instantly.
+                            </div>
+                          )}
+                        </div>
                       </RadioGroup>
 
                       <div className="pt-4 space-y-3">

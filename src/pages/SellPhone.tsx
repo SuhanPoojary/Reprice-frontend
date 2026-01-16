@@ -16,6 +16,18 @@ import { Search, ArrowRight, Heart } from "lucide-react";
 import { Link } from "react-router-dom";
 import Autoplay from "embla-carousel-autoplay";
 
+function formatVariant(variant?: string) {
+  if (!variant) return null;
+
+  const raw = variant.trim();
+  if (!raw || raw === "N/A") return null;
+
+  const compact = raw.replace(/\s+/g, "").match(/^(\d+)(GB)?\/(\d+)(GB)?$/i);
+  if (compact) return `${compact[1]}/${compact[3]}`;
+
+  return raw;
+}
+
 console.log("🔥 THIS SellPhone FILE IS LOADED");
 
 /* ================= TYPES ================= */
@@ -34,6 +46,7 @@ interface Phone {
   brand: string;
   image: string;
   maxPrice: number;
+  variant?: string;
 }
 
 /* ================= DATA ================= */
@@ -335,9 +348,12 @@ export default function SellPhone() {
                               <h3 className="font-bold text-sm mb-1 line-clamp-2 text-gray-900">
                                 {phone.name}
                               </h3>
-                              <p className="text-xs text-gray-500 mb-2">
-                                {phone.brand}
-                              </p>
+
+                              {phone.variant && formatVariant(phone.variant) && (
+                                <p className="text-xs text-gray-600 font-medium">
+                                  {phone.brand.toUpperCase()} : {formatVariant(phone.variant)}
+                                </p>
+                              )}
                               <div className="pt-2">
                                 <div className="flex items-center justify-between gap-2">
                                   <p className="text-lg font-bold text-gray-900">
