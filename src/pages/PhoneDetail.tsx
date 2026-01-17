@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/context/AuthContext";
 import {
   Check,
   ArrowRight,
@@ -14,6 +15,7 @@ import {
   HardDrive,
   Smartphone,
   DollarSign,
+  Info,
 } from "lucide-react";
 
 const STEPS = [
@@ -27,7 +29,6 @@ function formatVariant(variant: unknown): string | undefined {
   const raw = variant.trim();
   if (!raw || raw === "N/A") return undefined;
 
-  // Prefer a compact display like "4/64" when input looks like "4GB/64GB".
   const compactGb = raw
     .replace(/\s+/g, "")
     .match(/^(\d+)(GB)?\/(\d+)(GB)?$/i);
@@ -39,6 +40,7 @@ function formatVariant(variant: unknown): string | undefined {
 export default function PhoneDetail() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
   const passedPhone = location.state?.phoneData;
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -52,7 +54,6 @@ export default function PhoneDetail() {
   const [apiLogs, setApiLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ VALIDATE PHONE DATA
   if (!passedPhone) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -64,13 +65,11 @@ export default function PhoneDetail() {
     );
   }
 
-  // ✅ SINGLE PHONE OBJECT - NO DUPLICATES
   const phone = {
     id: passedPhone.id,
     name: passedPhone.name,
     brand: passedPhone.brand,
     variant: passedPhone.variant,
-    // ✅ USE THE REAL IMAGE FROM CSV/API
     image: passedPhone.image || `https://placehold.co/200x200/3b82f6/white?text=${encodeURIComponent(passedPhone.brand + ' ' + passedPhone.name)}`,
     releaseYear: 2023,
     description: `Sell your ${passedPhone.name} for the best price.`,
@@ -159,7 +158,7 @@ export default function PhoneDetail() {
   };
 
   const generateAIReasoning = () => {
-    const reasons = [];
+    const reasons: string[] = [];
     const screenOption = phone.screenConditions.find(
       (s) => s.id === selectedScreenCondition
     );
@@ -177,7 +176,9 @@ export default function PhoneDetail() {
     if (deviceTurnsOn === "yes") {
       reasons.push(`✓ Device powers on properly adds ₹2,000`);
     } else if (deviceTurnsOn === "no") {
-      reasons.push(`• Device not turning on significantly reduces value by ₹8,000`);
+      reasons.push(
+        `• Device not turning on significantly reduces value by ₹8,000`
+      );
     }
     if (hasOriginalBox === "yes") {
       reasons.push(`✓ Original box included adds ₹1,000`);
@@ -199,6 +200,35 @@ export default function PhoneDetail() {
         isUnderWarranty !== ""
       );
     return true;
+  };
+
+  const handleProceedToSell = () => {
+    const checkoutState = {
+      phoneData: {
+        id: phone.id,
+        name: phone.name,
+        brand: phone.brand,
+        variant: phone.variant ?? "N/A",
+        condition:
+          phone.screenConditions.find((s) => s.id === selectedScreenCondition)
+            ?.name ?? "Good",
+        price: apiPrice ?? phone.basePrice,
+        maxPrice: phone.basePrice,
+        image: phone.image,
+      },
+    };
+
+    if (!isLoggedIn) {
+      navigate("/login", {
+        state: {
+          redirectTo: "/checkout",
+          redirectState: checkoutState,
+        },
+      });
+      return;
+    }
+
+    navigate("/checkout", { state: checkoutState });
   };
 
   const progress = (currentStep / STEPS.length) * 100;
@@ -257,16 +287,18 @@ export default function PhoneDetail() {
                   {currentStep === 3 && (
                     <>
                       <h1 className="text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
-                        Your Final Quote
+                        Your Price Quote
                       </h1>
                       <p className="text-gray-600 text-lg">
-                        Based on your selections
+                        {!isLoggedIn 
+                          ? "Login is only required to schedule pickup and place the order."
+                          : "Based on your selections"}
                       </p>
                     </>
                   )}
                 </div>
 
-                {/* ✅ PHONE INFO CARD WITH REAL IMAGE */}
+                {/* Phone Info Card */}
                 <Card className="bg-white/60 backdrop-blur border-0 shadow-lg">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-4">
@@ -281,18 +313,14 @@ export default function PhoneDetail() {
                       <div>
                         <h3 className="font-bold text-lg">{phone.name}</h3>
                         <p className="text-sm text-gray-600">
-                          {phone.brand} • {phone.releaseYear}
+                          {phone.brand} • {(() => {
+                            const variant = formatVariant(phone.variant);
+                            return variant ? variant : '';
+                          })()}{(() => {
+                            const variant = formatVariant(phone.variant);
+                            return variant ? 'GB' : '';
+                          })()}{currentStep === 3 && selectedScreenCondition && ` • ${phone.screenConditions.find(s => s.id === selectedScreenCondition)?.name}`}
                         </p>
-                        {(() => {
-  const variant = formatVariant(phone.variant);
-  if (!variant) return null;
-  return (
-    <p className="text-sm text-gray-600 mt-1">
-      {phone.brand.toUpperCase()} : {variant}
-    </p>
-  );
-})()}
-
                         <p className="text-sm font-semibold text-blue-600 mt-1">
                           Base: ₹
                           {(apiBasePrice !== null
@@ -322,7 +350,7 @@ export default function PhoneDetail() {
             {/* Right Side - Options Panel */}
             <div className="flex flex-col justify-center">
               <div className="max-w-xl mx-auto w-full space-y-4">
-                {/* Step 1: Variant (auto-detected) */}
+                {/* Step 1: Variant */}
                 {currentStep === 1 && (
                   <Card className="bg-white/60 backdrop-blur border-0 shadow-lg">
                     <CardContent className="p-6">
@@ -555,7 +583,7 @@ export default function PhoneDetail() {
                   <div className="space-y-6">
                     {/* Price Card */}
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 text-white">
-                      <p className="text-sm opacity-90 mb-2">Estimated Value</p>
+                      <p className="text-sm opacity-90 mb-2">Estimated Price</p>
                       {isLoading ? (
                         <p className="text-4xl font-bold mb-4 animate-pulse">
                           Calculating...
@@ -624,29 +652,23 @@ export default function PhoneDetail() {
                       </div>
                     </div>
 
-                    <Link
-                      to="/checkout"
-                      state={{
-                        phoneData: {
-                          id: phone.id,
-                          name: phone.name,
-                          brand: phone.brand,
-                          variant: phone.variant ?? "N/A",
-                          condition:
-                            phone.screenConditions.find(
-                              (s) => s.id === selectedScreenCondition
-                            )?.name ?? "Good",
-                          price: apiPrice ?? phone.basePrice,
-                          maxPrice: phone.basePrice,
-                          image: phone.image,
-                        },
-                      }}
-                    >
-
-                      <Button className="w-full h-14 text-lg rounded-2xl">
+                    {/* Buttons */}
+                    <div className="space-y-3">
+                      <Button 
+                        onClick={handleProceedToSell}
+                        className="w-full h-14 text-lg rounded-2xl"
+                      >
                         Proceed to Sell <ArrowRight className="ml-2" />
                       </Button>
-                    </Link>
+                      
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate("/")}
+                        className="w-full h-12 text-base rounded-2xl"
+                      >
+                        Change Phone
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -669,8 +691,6 @@ export default function PhoneDetail() {
           </div>
         </div>
       </main>
-
-      
     </div>
   );
 }

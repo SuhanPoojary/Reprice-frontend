@@ -7,32 +7,28 @@ import {
   ReactNode,
 } from "react";
 
-const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
+const API_URL =
+  (import.meta.env.VITE_API_URL as string | undefined) ||
+  "https://reprice-backend-a5mp.onrender.com/api";
 
 interface User {
   id: string | number;
   name: string;
   email?: string;
   phone?: string;
-  role: "user" | "agent" | "customer";
-  userType?: "customer" | "agent";
+  role: "customer";
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoggedIn: boolean;
-  login: (
-    identifier: string,
-    password: string,
-    role: "user" | "agent" | "customer",
-    name?: string
-  ) => Promise<boolean>;
+  login: (phone: string, password: string, name?: string) => Promise<boolean>;
+  googleLogin: (credential: string) => Promise<boolean>;
   signup: (
     name: string,
     phone: string,
     password: string,
-    userType: "customer" | "agent",
     email?: string
   ) => Promise<boolean>;
   logout: () => void;
@@ -66,34 +62,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const roleToUserType = (
-    role: "user" | "agent" | "customer"
-  ): "customer" | "agent" => {
-    return role === "agent" ? "agent" : "customer";
-  };
-
-  const userTypeToRole = (
-    userType: "customer" | "agent"
-  ): "user" | "agent" | "customer" => {
-    return userType === "agent" ? "agent" : "customer";
-  };
-
   const login = async (
-    identifier: string,
+    phone: string,
     password: string,
-    role: "user" | "agent" | "customer",
     name?: string
   ): Promise<boolean> => {
     try {
-      const userType = roleToUserType(role);
-
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone: identifier,
+          phone,
           password,
-          userType,
+          userType: "customer",
         }),
       });
 
@@ -105,8 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: data.data.user.name,
           email: data.data.user.email,
           phone: data.data.user.phone,
-          role: userTypeToRole(data.data.user.userType),
-          userType: data.data.user.userType,
+          role: "customer",
         };
 
         setUser(backendUser);
@@ -123,14 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      if (identifier && password.length >= 4) {
+      if (phone && password.length >= 4) {
         const mockUser: User = {
-          id: `${role}-${Date.now()}`,
-          name: name || identifier.split("@")[0],
-          email: identifier.includes("@") ? identifier : undefined,
-          phone: !identifier.includes("@") ? identifier : undefined,
-          role: role === "customer" ? "user" : role,
-          userType: roleToUserType(role),
+          id: `customer-${Date.now()}`,
+          name: name || "Customer",
+          phone,
+          role: "customer",
         };
 
         const mockToken = `mock-token-${Date.now()}`; // ✅ ADDED
@@ -147,11 +125,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const googleLogin = async (credential: string): Promise<boolean> => {
+    try {
+      const endpoint = `${API_URL}/auth/google`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          credential,
+          idToken: credential,
+          userType: "customer",
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (data?.success && data?.data) {
+        const backendUser: User = {
+          id: data.data.user.id,
+          name: data.data.user.name,
+          email: data.data.user.email,
+          phone: data.data.user.phone,
+          role: "customer",
+        };
+
+        setUser(backendUser);
+        setToken(data.data.token);
+        localStorage.setItem("currentUser", JSON.stringify(backendUser));
+        localStorage.setItem("token", data.data.token);
+
+        return true;
+      }
+
+      // If the endpoint exists but auth failed, do not try others.
+      if (response.ok) {
+        return false;
+      }
+
+      if (response.status === 404) {
+        console.warn(
+          "Google login endpoint not found on backend. Expected:",
+          endpoint
+        );
+      }
+
+      return false;
+    } catch (error) {
+      console.warn("Backend not available, using mock Google authentication:", error);
+
+      await new Promise((resolve) => setTimeout(resolve, 700));
+
+      if (credential && credential.length > 20) {
+        const mockUser: User = {
+          id: `customer-google-${Date.now()}`,
+          name: "Customer",
+          role: "customer",
+        };
+
+        const mockToken = `mock-google-token-${Date.now()}`;
+
+        setUser(mockUser);
+        setToken(mockToken);
+        localStorage.setItem("currentUser", JSON.stringify(mockUser));
+        localStorage.setItem("token", mockToken);
+
+        return true;
+      }
+
+      return false;
+    }
+  };
+
   const signup = async (
     name: string,
     phone: string,
     password: string,
-    userType: "customer" | "agent",
     email?: string
   ): Promise<boolean> => {
     try {
@@ -163,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone,
           email,
           password,
-          userType,
+          userType: "customer",
         }),
       });
 
@@ -175,8 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: data.data.user.name,
           email: data.data.user.email,
           phone: data.data.user.phone,
-          role: userTypeToRole(data.data.user.userType),
-          userType: data.data.user.userType,
+          role: "customer",
         };
 
         setUser(backendUser);
@@ -195,12 +242,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (name && phone && password.length >= 4) {
         const mockUser: User = {
-          id: `${userType}-${Date.now()}`,
+          id: `customer-${Date.now()}`,
           name,
           email,
           phone,
-          role: userTypeToRole(userType),
-          userType,
+          role: "customer",
         };
 
         const mockToken = `mock-token-${Date.now()}`; // ✅ ADDED
@@ -231,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         isLoggedIn: !!token,
         login,
+        googleLogin,
         signup,
         logout,
         isLoading,

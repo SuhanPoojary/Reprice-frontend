@@ -114,9 +114,9 @@ export default function OrderDetails() {
   const getStatusText = (status: string) => {
     switch (status) {
       case "pending":
-        return "Waiting for Agent";
+        return "Pickup Scheduled";
       case "in-progress":
-        return "Agent on the Way";
+        return "Pickup on the Way";
       case "completed":
         return "Pickup Completed";
       case "cancelled":
@@ -418,34 +418,6 @@ export default function OrderDetails() {
               </div>
             </div>
 
-            {/* Agent Details (if assigned) */}
-            {order.agent_name && (
-              <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-2">
-                <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <Truck className="text-blue-600" size={20} />
-                  Pickup Agent
-                </h2>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                    {order.agent_name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-lg">{order.agent_name}</p>
-                    <p className="text-gray-600 flex items-center gap-2">
-                      <Phone size={14} />
-                      {order.agent_phone}
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() =>
-                      (window.location.href = `tel:${order.agent_phone}`)
-                    }
-                  >
-                    Call Agent
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Help Section */}

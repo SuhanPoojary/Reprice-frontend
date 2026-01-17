@@ -2,14 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import {
-  Menu,
-  Phone,
-  User,
-  Users,
-  LogOut,
-  LayoutDashboard,
-} from "lucide-react";
+import { Menu, Phone, User, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export function Header() {
@@ -53,30 +46,21 @@ export function Header() {
             </Link>
 
             <nav className="hidden md:flex items-center space-x-6 ml-10">
-              {isLoggedIn && user?.role === "customer" ? (
-  <Link
-    to="/sell"
-    className="text-sm font-medium hover:text-primary transition-colors"
-  >
-    Sell Phone
-  </Link>
-) : !isLoggedIn ? (
-  <span
-    className="text-sm font-medium text-gray-400 cursor-not-allowed opacity-60"
-    title="Login to access selling"
-  >
-    Sell Phone
-  </span>
-) : null}
+              <Link
+                to="/sell"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
+                Sell Phone
+              </Link>
 
-{isLoggedIn && user?.role === "customer" && (
-  <Link
-    to="/my-orders"
-    className="text-sm font-medium hover:text-primary transition-colors"
-  >
-    My Orders
-  </Link>
-)}
+              {isLoggedIn && (
+                <Link
+                  to="/my-orders"
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
+                  My Orders
+                </Link>
+              )}
 
 
               <Link
@@ -104,16 +88,6 @@ export function Header() {
             {/* Conditional rendering based on login state */}
             {isLoggedIn ? (
               <>
-                {/* Show Dashboard link for agents */}
-                {user?.role === "agent" && (
-                  <Link to="/agent/dashboard" className="hidden md:block">
-                    <Button variant="ghost" className="flex items-center gap-2">
-                      <LayoutDashboard size={18} />
-                      Dashboard
-                    </Button>
-                  </Link>
-                )}
-
                 {/* User info badge */}
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full border border-blue-100">
                   <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
@@ -151,19 +125,9 @@ export function Header() {
                 </Button>
 
                 {/* Sell Now button */}
-                <Link to="/login">
+                <Link to="/sell">
                   <Button className="bg-primary text-primary-foreground hover:brightness-95 hidden md:inline-flex">
                     Sell Now
-                  </Button>
-                </Link>
-
-                {/* Become Agent button */}
-                <Link to="/login">
-                  <Button
-                    variant="outline"
-                    className="border-primary text-primary hover:bg-primary/10 hidden lg:inline-flex"
-                  >
-                    Become Agent
                   </Button>
                 </Link>
               </>
@@ -178,29 +142,21 @@ export function Header() {
               </SheetTrigger>
               <SheetContent side="right">
                 <div className="grid gap-6 py-6">
-                  {isLoggedIn ? (
+                  <Link
+                    to="/sell"
+                    className="text-base font-medium hover:text-blue-600 transition-colors"
+                  >
+                    Sell Phone
+                  </Link>
+
+                  {isLoggedIn && (
                     <Link
-                      to="/sell"
+                      to="/my-orders"
                       className="text-base font-medium hover:text-blue-600 transition-colors"
                     >
-                      Sell Phone
+                      My Orders
                     </Link>
-                  ) : (
-                    <div
-                      className="text-base font-medium text-gray-400 cursor-not-allowed opacity-60"
-                      title="Login to access selling"
-                    >
-                      Sell Phone
-                    </div>
                   )}
-                  {isLoggedIn && user?.role === "customer" && (
-  <Link
-    to="/my-orders"
-    className="text-base font-medium hover:text-blue-600 transition-colors"
-  >
-    My Orders
-  </Link>
-)}
 
                   <Link
                     to="/how-it-works"
@@ -233,24 +189,9 @@ export function Header() {
                             <p className="font-medium text-gray-900">
                               {user?.name}
                             </p>
-                            <p className="text-xs text-gray-500 capitalize">
-                              {user?.role}
-                            </p>
+                            <p className="text-xs text-gray-500">Customer</p>
                           </div>
                         </div>
-
-                        {/* Dashboard link for agents */}
-                        {user?.role === "agent" && (
-                          <Link to="/agent/dashboard">
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start"
-                            >
-                              <LayoutDashboard size={16} className="mr-2" />
-                              Dashboard
-                            </Button>
-                          </Link>
-                        )}
 
                         {/* Logout button */}
                         <Button
@@ -275,23 +216,6 @@ export function Header() {
                             >
                               <User size={16} className="mr-2" />
                               Customer Login
-                            </Button>
-                          </Link>
-                          <Link to="/login">
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start"
-                            >
-                              <Users size={16} className="mr-2" />
-                              Agent Login
-                            </Button>
-                          </Link>
-                        </div>
-
-                        <div className="border-t pt-6 mt-3">
-                          <Link to="/login">
-                            <Button className="w-full bg-purple-600 hover:bg-purple-700">
-                              Become an Agent
                             </Button>
                           </Link>
                         </div>

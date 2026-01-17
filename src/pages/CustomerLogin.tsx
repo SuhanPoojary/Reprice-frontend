@@ -148,13 +148,7 @@ export default function CustomerLogin() {
           </Card>
 
           <div className="mt-6 text-center text-sm text-gray-600">
-            Are you an agent?{" "}
-            <Link
-              to="/agent/login"
-              className="text-primary hover:underline font-medium"
-            >
-              Login here
-            </Link>
+            Selling is available without login — sign in only to track orders.
           </div>
         </div>
       </div>

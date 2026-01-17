@@ -78,7 +78,7 @@ const getCurrentLocation = (): Promise<{
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { token } = useAuth(); 
+  const { token, isLoggedIn } = useAuth(); 
   const [paymentMethod, setPaymentMethod] = useState("upi");
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,6 +126,85 @@ export default function Checkout() {
       price: 40000,
       image: "/assets/phones/iphone-13-pro.png",
     };
+
+  const handleProceedToSell = () => {
+    if (isLoggedIn) return;
+    navigate("/login", {
+      state: {
+        redirectTo: "/checkout",
+        redirectState: location.state,
+      },
+    });
+  };
+
+  // Logged-out users should only see the price/quote summary in Checkout.
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <Header />
+
+        <main className="flex-grow py-10">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-6">
+                  <h1 className="text-2xl font-bold text-white">
+                    Your Price Quote
+                  </h1>
+                  <p className="text-blue-100 text-sm mt-1">
+                    Login is only required to schedule pickup and place the order.
+                  </p>
+                </div>
+
+                <div className="p-6">
+                  <div className="flex flex-col sm:flex-row gap-5 items-start">
+                    <img
+                      src={phoneData.image}
+                      alt={phoneData.name}
+                      className="w-28 h-28 object-contain rounded-xl bg-slate-50 border"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://placehold.co/200x200?text=${encodeURIComponent(
+                          phoneData.name
+                        )}`;
+                      }}
+                    />
+                    <div className="flex-1">
+                      <div className="text-lg font-bold text-gray-900">
+                        {phoneData.name}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {phoneData.brand} • {phoneData.variant} • {phoneData.condition}
+                      </div>
+
+                      <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                        <div className="text-sm text-emerald-700 font-medium">
+                          Estimated Price
+                        </div>
+                        <div className="text-3xl font-extrabold text-emerald-700 mt-1">
+                          ₹{Number(phoneData.price || 0).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-end">
+                    <Link to="/sell">
+                      <Button variant="outline">Change Phone</Button>
+                    </Link>
+                    <Button onClick={handleProceedToSell}>
+                      Proceed to Sell
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
 
   const handleSubmitAddress = (e: React.FormEvent) => {
     e.preventDefault();

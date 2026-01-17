@@ -17,15 +17,12 @@ import MyOrders from "@/pages/MyOrders";
 // Lazy load less critical pages
 const Login = lazy(() => import("./pages/Login"));
 const Brands = lazy(() => import("./pages/Brands"));
+
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 
-// Auth pages
-const AgentLogin = lazy(() => import("./pages/AgentLogin"));
-const CustomerLogin = lazy(() => import("./pages/CustomerLogin"));
-const AgentDashboard = lazy(() => import("./pages/AgentDashboard"));
 
 const queryClient = new QueryClient();
 
@@ -48,27 +45,20 @@ const App = () => (
               <Route path="/sell" element={<SellPhone />} />
               <Route path="/sell/:phoneId" element={<PhoneDetail />} />
 
-              {/* Customer routes */}
-              {/* <Route path="/customer/login" element={<CustomerLogin />} /> */}
-
-              {/* Agent routes */}
-              {/* <Route path="/agent/login" element={<AgentLogin />} />
-            <Route path="/login" element={<AgentLogin />} /> */}
-
               {/* Lazy loaded pages */}
               <Route path="/login" element={<Login />} />
+
               <Route path="/brands" element={<Brands />} />
               <Route path="/brands/:brandId" element={<Brands />} />
+              
+              
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/about-us" element={<AboutUs />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/checkout" element={<Checkout />} />
-              <Route path="/agent/login" element={<AgentLogin />} />
               
               <Route path="/order/:orderId" element={<OrderDetails />} />
               <Route path="/my-orders" element={<MyOrders />} />
-
-              <Route path="/agent/dashboard" element={<AgentDashboard />} />
 
               {/* Catch all */}
               <Route path="*" element={<NotFound />} />
