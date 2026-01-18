@@ -16,6 +16,7 @@ import {
   Smartphone,
   DollarSign,
   Info,
+  Loader2,
 } from "lucide-react";
 
 const STEPS = [
@@ -23,6 +24,27 @@ const STEPS = [
   { id: 2, name: "Condition", icon: Smartphone },
   { id: 3, name: "Final Quote", icon: DollarSign },
 ];
+
+/**
+ * Safely format a number as currency, handling null/undefined/NaN
+ */
+const formatPrice = (value: number | null | undefined): string => {
+  if (value === null || value === undefined || isNaN(value)) {
+    return "0";
+  }
+
+  const numValue = Number(value);
+  if (!isFinite(numValue)) {
+    return "0";
+  }
+
+  return Math.round(numValue).toLocaleString("en-IN");
+};
+
+const API_BASE_URL = (import.meta.env.VITE_AI_API_URL as string | undefined) ??
+  "https://reprice-ml3.onrender.com";
+
+type BackendStatus = "unknown" | "ready" | "initializing" | "down";
 
 function formatVariant(variant: unknown): string | undefined {
   if (typeof variant !== "string") return undefined;
@@ -53,6 +75,8 @@ export default function PhoneDetail() {
   const [apiBasePrice, setApiBasePrice] = useState<number | null>(null);
   const [apiLogs, setApiLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown");
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   if (!passedPhone) {
     return (
@@ -114,10 +138,56 @@ export default function PhoneDetail() {
     }
   }, [currentStep]);
 
-  const fetchPriceFromBackend = async () => {
-    setIsLoading(true);
+  const checkBackendHealth = async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 4000);
+
     try {
-      const response = await fetch("https://reprice-ml3.onrender.com/calculate-price", {
+      // Try a health endpoint first (if present)
+      const healthRes = await fetch(`${API_BASE_URL}/health`, {
+        method: "GET",
+        signal: controller.signal,
+      }).catch(() => null);
+
+      if (healthRes && healthRes.ok) {
+        setBackendStatus("ready");
+        return;
+      }
+
+      // Fallback: if /health doesn't exist, check base URL reachability
+      const rootRes = await fetch(`${API_BASE_URL}/`, {
+        method: "GET",
+        signal: controller.signal,
+      }).catch(() => null);
+
+      if (rootRes && rootRes.ok) {
+        setBackendStatus("ready");
+      } else {
+        setBackendStatus("down");
+      }
+    } catch {
+      setBackendStatus("down");
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  };
+
+  useEffect(() => {
+    checkBackendHealth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchPriceFromBackend = async () => {
+    if (backendStatus !== "ready") {
+      console.log("Backend not ready, using fallback pricing");
+      return;
+    }
+
+    setIsLoading(true);
+    setBackendError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/calculate-price`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -133,12 +203,42 @@ export default function PhoneDetail() {
           is_under_warranty: isUnderWarranty === "yes",
         }),
       });
+
+      if (!response.ok) {
+        if (response.status === 503) {
+          setBackendStatus("initializing");
+          setBackendError("AI service still loading. Using estimated pricing...");
+          window.setTimeout(checkBackendHealth, 3000);
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData?.detail || `Server error: ${response.status}`);
+        }
+        return;
+      }
+
       const data = await response.json();
-      setApiPrice(data.final_price);
-      setApiBasePrice(data.base_price);
-      setApiLogs(data.logs || []);
+
+      if (data && typeof data.final_price === "number" && isFinite(data.final_price)) {
+        setApiPrice(data.final_price);
+
+        if (typeof data.base_price === "number" && isFinite(data.base_price)) {
+          setApiBasePrice(data.base_price);
+        } else {
+          setApiBasePrice(null);
+        }
+
+        setApiLogs(Array.isArray(data.logs) ? data.logs : []);
+        setBackendError(null);
+      } else {
+        console.warn("Invalid price data from API:", data);
+        throw new Error("Invalid response from server");
+      }
     } catch (error) {
       console.error("Error fetching price:", error);
+      setBackendError("Using estimated pricing (AI unavailable)");
+      setApiPrice(null);
+      setApiBasePrice(null);
+      setApiLogs([]);
     } finally {
       setIsLoading(false);
     }
@@ -167,9 +267,7 @@ export default function PhoneDetail() {
         reasons.push(`✓ Excellent screen condition maintains full value`);
       } else {
         reasons.push(
-          `• Screen condition (${screenOption.name}) reduces value by ₹${Math.abs(
-            screenOption.priceAdjustment
-          ).toLocaleString()}`
+          `• Screen condition (${screenOption.name}) reduces value by ₹${formatPrice(Math.abs(screenOption.priceAdjustment))}`
         );
       }
     }
@@ -323,10 +421,7 @@ export default function PhoneDetail() {
                         </p>
                         <p className="text-sm font-semibold text-blue-600 mt-1">
                           Base: ₹
-                          {(apiBasePrice !== null
-                            ? apiBasePrice
-                            : phone.basePrice
-                          ).toLocaleString()}
+                          {formatPrice(apiBasePrice ?? phone.basePrice)}
                         </p>
                       </div>
                     </div>
@@ -585,18 +680,22 @@ export default function PhoneDetail() {
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 text-white">
                       <p className="text-sm opacity-90 mb-2">Estimated Price</p>
                       {isLoading ? (
-                        <p className="text-4xl font-bold mb-4 animate-pulse">
-                          Calculating...
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <Loader2 className="w-8 h-8 animate-spin" />
+                          <p className="text-4xl font-bold">Calculating...</p>
+                        </div>
                       ) : (
                         <p className="text-6xl font-bold mb-4">
                           ₹
-                          {(apiPrice !== null
-                            ? apiPrice
-                            : calculatePrice()
-                          ).toLocaleString()}
+                          {formatPrice(apiPrice ?? calculatePrice())}
                         </p>
                       )}
+                      {backendError ? (
+                        <div className="mt-2 text-sm text-white/90 flex items-start gap-2">
+                          <Info size={16} className="mt-0.5" />
+                          <span>{backendError}</span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center gap-2 text-sm opacity-90">
                         <Check size={16} />
                         <span>Instant payment upon verification</span>
@@ -616,10 +715,7 @@ export default function PhoneDetail() {
                           <span className="text-gray-600">Base Price</span>
                           <span className="font-semibold">
                             ₹
-                            {(apiBasePrice !== null
-                              ? apiBasePrice
-                              : phone.basePrice
-                            ).toLocaleString()}
+                            {formatPrice(apiBasePrice ?? phone.basePrice)}
                           </span>
                         </div>
                         {apiLogs.length > 0
@@ -643,10 +739,7 @@ export default function PhoneDetail() {
                           <span>Final Price</span>
                           <span className="text-blue-600">
                             ₹
-                            {(apiPrice !== null
-                              ? apiPrice
-                              : calculatePrice()
-                            ).toLocaleString()}
+                            {formatPrice(apiPrice ?? calculatePrice())}
                           </span>
                         </div>
                       </div>
