@@ -44,7 +44,24 @@ const formatPrice = (value: number | null | undefined): string => {
 const API_BASE_URL = (import.meta.env.VITE_AI_API_URL as string | undefined) ??
   "https://reprice-ml3.onrender.com";
 
+const AI_WARMUP_MAX_WAIT_MS = 20_000;
+const AI_WARMUP_RETRY_DELAY_MS = 1_250;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 type BackendStatus = "unknown" | "ready" | "initializing" | "down";
+
+// If true, the UI will prefer waiting for AI rather than showing any estimated quote.
+const PREFER_AI_QUOTE = true;
+
+type PriceResponse = {
+  final_price?: number | null;
+  base_price?: number | null;
+  logs?: unknown;
+  estimated?: boolean;
+};
 
 function formatVariant(variant: unknown): string | undefined {
   if (typeof variant !== "string") return undefined;
@@ -57,6 +74,33 @@ function formatVariant(variant: unknown): string | undefined {
   if (compactGb) return `${compactGb[1]}/${compactGb[3]}`;
 
   return raw;
+}
+
+function normalizeModelName(input: string) {
+  return input.trim().replace(/\s+/g, " ");
+}
+
+function stripBrandPrefix(fullName: string, brand: string) {
+  const name = normalizeModelName(fullName);
+  const b = normalizeModelName(brand);
+
+  if (!name || !b) return name;
+  const lowerName = name.toLowerCase();
+  const lowerBrand = b.toLowerCase();
+
+  if (lowerName === lowerBrand) return name;
+  if (lowerName.startsWith(lowerBrand + " ")) {
+    return name.slice(b.length).trim();
+  }
+
+  return name;
+}
+
+function buildModelNameCandidates(fullName: string, brand: string) {
+  const primary = normalizeModelName(fullName);
+  const stripped = stripBrandPrefix(fullName, brand);
+  const candidates = [primary, stripped].filter(Boolean);
+  return Array.from(new Set(candidates));
 }
 
 export default function PhoneDetail() {
@@ -77,6 +121,8 @@ export default function PhoneDetail() {
   const [isLoading, setIsLoading] = useState(false);
   const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown");
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [aiWaitDeadlineMs, setAiWaitDeadlineMs] = useState<number | null>(null);
+  const [aiWaitSeconds, setAiWaitSeconds] = useState<number>(0);
 
   if (!passedPhone) {
     return (
@@ -138,6 +184,19 @@ export default function PhoneDetail() {
     }
   }, [currentStep]);
 
+  useEffect(() => {
+    if (!aiWaitDeadlineMs) return;
+
+    const tick = () => {
+      const remainingMs = Math.max(0, aiWaitDeadlineMs - Date.now());
+      setAiWaitSeconds(Math.ceil(remainingMs / 1000));
+    };
+
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [aiWaitDeadlineMs]);
+
   const checkBackendHealth = async () => {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 4000);
@@ -150,7 +209,21 @@ export default function PhoneDetail() {
       }).catch(() => null);
 
       if (healthRes && healthRes.ok) {
-        setBackendStatus("ready");
+        const body = (await healthRes.json().catch(() => null)) as
+          | { vector_db_ready?: boolean; vector_db_initializing?: boolean }
+          | null;
+
+        if (body && typeof body.vector_db_ready === "boolean") {
+          if (body.vector_db_ready) {
+            setBackendStatus("ready");
+          } else if (body.vector_db_initializing) {
+            setBackendStatus("initializing");
+          } else {
+            setBackendStatus("ready");
+          }
+        } else {
+          setBackendStatus("ready");
+        }
         return;
       }
 
@@ -178,84 +251,145 @@ export default function PhoneDetail() {
   }, []);
 
   const fetchPriceFromBackend = async () => {
-    if (backendStatus !== "ready") {
-      console.log("Backend not ready, using fallback pricing");
-      return;
-    }
+    // Don't bail out just because the health check failed.
+    // Cold starts can make /health time out, but /calculate-price may succeed shortly after.
 
     setIsLoading(true);
     setBackendError(null);
+    setAiWaitDeadlineMs(Date.now() + AI_WARMUP_MAX_WAIT_MS);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/calculate-price`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model_name: phone.name,
-          turns_on: deviceTurnsOn === "yes",
-          screen_condition:
-            phone.screenConditions.find((s) => s.id === selectedScreenCondition)
-              ?.name || "Good",
-          has_box: hasOriginalBox === "yes",
-          has_bill: hasOriginalBill === "yes",
-          is_under_warranty: isUnderWarranty === "yes",
-        }),
-      });
+      const candidates = buildModelNameCandidates(phone.name, phone.brand);
 
-      if (!response.ok) {
-        if (response.status === 503) {
-          setBackendStatus("initializing");
-          setBackendError("AI service still loading. Using estimated pricing...");
-          window.setTimeout(checkBackendHealth, 3000);
-        } else {
+      const warmupStart = Date.now();
+
+      let lastLogs: string[] = [];
+      let lastEstimated = false;
+
+      for (const modelCandidate of candidates) {
+        let response: Response | null = null;
+        // If the service is cold-starting, it may return 503 for a few seconds.
+        // Wait/retry (up to AI_WARMUP_MAX_WAIT_MS total) so the user gets the real AI quote.
+        while (true) {
+          try {
+            response = await fetch(`${API_BASE_URL}/calculate-price`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model_name: modelCandidate,
+            turns_on: deviceTurnsOn === "yes",
+            screen_condition:
+              phone.screenConditions.find((s) => s.id === selectedScreenCondition)
+                ?.name || "Good",
+            has_box: hasOriginalBox === "yes",
+            has_bill: hasOriginalBill === "yes",
+            is_under_warranty: isUnderWarranty === "yes",
+                prefer_ai: PREFER_AI_QUOTE,
+          }),
+            });
+          } catch {
+            response = null;
+          }
+
+          // Network/timeout while the service is booting: retry for a bit.
+          if (!response) {
+            setBackendStatus("initializing");
+            setBackendError("AI warming up… please wait");
+
+            if (Date.now() - warmupStart >= AI_WARMUP_MAX_WAIT_MS) {
+              setBackendStatus("down");
+              setBackendError("AI service unavailable right now. Please try again.");
+              return;
+            }
+
+            await sleep(AI_WARMUP_RETRY_DELAY_MS);
+            continue;
+          }
+
+          if (response && response.status === 503) {
+            setBackendStatus("initializing");
+            setBackendError("AI warming up… please wait");
+
+            if (Date.now() - warmupStart >= AI_WARMUP_MAX_WAIT_MS) {
+              setBackendError("AI service is still loading. Please try again.");
+              window.setTimeout(checkBackendHealth, 1500);
+              return;
+            }
+
+            await sleep(AI_WARMUP_RETRY_DELAY_MS);
+            continue;
+          }
+
+          break;
+        }
+
+        if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData?.detail || `Server error: ${response.status}`);
         }
+
+        const data = (await response.json()) as PriceResponse;
+
+        const finalPrice =
+          typeof data?.final_price === "number" && isFinite(data.final_price)
+            ? data.final_price
+            : null;
+
+        const basePrice =
+          typeof data?.base_price === "number" && isFinite(data.base_price)
+            ? data.base_price
+            : null;
+
+        const logs = Array.isArray(data?.logs)
+          ? (data.logs.filter((l): l is string => typeof l === "string") as string[])
+          : [];
+
+        lastLogs = logs;
+        lastEstimated = Boolean(data?.estimated);
+
+        // If the API couldn't find any base price, it's effectively a "no match".
+        // Retry with another candidate (e.g., without brand prefix).
+        const noMatch = basePrice === null && (finalPrice === null || finalPrice <= 0);
+        if (noMatch) continue;
+
+        setApiPrice(finalPrice);
+        setApiBasePrice(basePrice);
+        setApiLogs(logs);
+        // If backend ever returns an estimated quote, we still treat it as not acceptable here.
+        // We want only the AI-predicted quote.
+        if (lastEstimated) {
+          setApiPrice(null);
+          setApiBasePrice(null);
+          setApiLogs(logs);
+          setBackendError("AI warming up… please wait");
+          continue;
+        }
+
+        setBackendError(null);
+        setAiWaitDeadlineMs(null);
         return;
       }
 
-      const data = await response.json();
-
-      if (data && typeof data.final_price === "number" && isFinite(data.final_price)) {
-        setApiPrice(data.final_price);
-
-        if (typeof data.base_price === "number" && isFinite(data.base_price)) {
-          setApiBasePrice(data.base_price);
-        } else {
-          setApiBasePrice(null);
-        }
-
-        setApiLogs(Array.isArray(data.logs) ? data.logs : []);
-        setBackendError(null);
-      } else {
-        console.warn("Invalid price data from API:", data);
-        throw new Error("Invalid response from server");
-      }
+      // All candidates failed to resolve to a usable quote.
+      setApiPrice(null);
+      setApiBasePrice(null);
+      setApiLogs(lastLogs);
+      setBackendError("No AI pricing match found for this model.");
     } catch (error) {
       console.error("Error fetching price:", error);
-      setBackendError("Using estimated pricing (AI unavailable)");
+      setBackendError("AI unavailable right now. Please try again.");
       setApiPrice(null);
       setApiBasePrice(null);
       setApiLogs([]);
     } finally {
       setIsLoading(false);
+      setAiWaitDeadlineMs(null);
     }
   };
 
-  const calculatePrice = () => {
-    let price = phone.basePrice;
-    const screenAdj =
-      phone.screenConditions.find((s) => s.id === selectedScreenCondition)
-        ?.priceAdjustment || 0;
-    price += screenAdj;
-    if (deviceTurnsOn === "yes") price += 2000;
-    else if (deviceTurnsOn === "no") price -= 8000;
-    if (hasOriginalBox === "yes") price += 1000;
-    if (hasOriginalBill === "yes") price += 1500;
-    return Math.max(price, 0);
-  };
+  const hasAiQuote = typeof apiPrice === "number" && isFinite(apiPrice) && apiPrice > 0;
 
   const generateAIReasoning = () => {
     const reasons: string[] = [];
@@ -301,6 +435,10 @@ export default function PhoneDetail() {
   };
 
   const handleProceedToSell = () => {
+    if (!hasAiQuote) {
+      setBackendError("AI price is still loading. Please wait.");
+      return;
+    }
     const checkoutState = {
       phoneData: {
         id: phone.id,
@@ -310,7 +448,7 @@ export default function PhoneDetail() {
         condition:
           phone.screenConditions.find((s) => s.id === selectedScreenCondition)
             ?.name ?? "Good",
-        price: apiPrice ?? phone.basePrice,
+        price: apiPrice,
         maxPrice: phone.basePrice,
         image: phone.image,
       },
@@ -678,24 +816,28 @@ export default function PhoneDetail() {
                   <div className="space-y-6">
                     {/* Price Card */}
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 text-white">
-                      <p className="text-sm opacity-90 mb-2">Estimated Price</p>
-                      {isLoading ? (
-                        <div className="flex items-center gap-3">
-                          <Loader2 className="w-8 h-8 animate-spin" />
-                          <p className="text-4xl font-bold">Calculating...</p>
+                      <p className="text-sm opacity-90 mb-2">AI Predicted Price</p>
+
+                      {!hasAiQuote ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                            <p className="text-2xl font-bold">AI warming up…</p>
+                          </div>
+                          <div className="text-sm text-white/90 flex items-start gap-2">
+                            <Info size={16} className="mt-0.5" />
+                            <span>
+                              Please wait{aiWaitSeconds > 0 ? ` (${aiWaitSeconds}s)` : ""} for AI price
+                            </span>
+                          </div>
+                          {backendError ? (
+                            <div className="text-sm text-white/90">{backendError}</div>
+                          ) : null}
                         </div>
                       ) : (
-                        <p className="text-6xl font-bold mb-4">
-                          ₹
-                          {formatPrice(apiPrice ?? calculatePrice())}
-                        </p>
+                        <p className="text-6xl font-bold mb-4">₹{formatPrice(apiPrice)}</p>
                       )}
-                      {backendError ? (
-                        <div className="mt-2 text-sm text-white/90 flex items-start gap-2">
-                          <Info size={16} className="mt-0.5" />
-                          <span>{backendError}</span>
-                        </div>
-                      ) : null}
+
                       <div className="flex items-center gap-2 text-sm opacity-90">
                         <Check size={16} />
                         <span>Instant payment upon verification</span>
@@ -710,49 +852,61 @@ export default function PhoneDetail() {
                         </span>
                         Price Breakdown
                       </h4>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm pb-3 border-b">
-                          <span className="text-gray-600">Base Price</span>
-                          <span className="font-semibold">
-                            ₹
-                            {formatPrice(apiBasePrice ?? phone.basePrice)}
-                          </span>
+                      {!hasAiQuote ? (
+                        <div className="text-sm text-gray-700">
+                          AI price breakdown will appear once the AI quote is ready.
                         </div>
-                        {apiLogs.length > 0
-                          ? apiLogs.map((log, idx) => (
-                              <div
-                                key={idx}
-                                className="text-sm text-gray-700 pl-4 border-l-2 border-blue-300 py-1"
-                              >
-                                {log}
-                              </div>
-                            ))
-                          : generateAIReasoning().map((reason, idx) => (
-                              <div
-                                key={idx}
-                                className="text-sm text-gray-700 pl-4 border-l-2 border-blue-300 py-1"
-                              >
-                                {reason}
-                              </div>
-                            ))}
-                        <div className="pt-3 mt-3 border-t border-gray-200 flex justify-between font-bold">
-                          <span>Final Price</span>
-                          <span className="text-blue-600">
-                            ₹
-                            {formatPrice(apiPrice ?? calculatePrice())}
-                          </span>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex justify-between text-sm pb-3 border-b">
+                            <span className="text-gray-600">Base Price</span>
+                            <span className="font-semibold">₹{formatPrice(apiBasePrice ?? phone.basePrice)}</span>
+                          </div>
+                          {apiLogs.length > 0
+                            ? apiLogs.map((log, idx) => (
+                                <div
+                                  key={idx}
+                                  className="text-sm text-gray-700 pl-4 border-l-2 border-blue-300 py-1"
+                                >
+                                  {log}
+                                </div>
+                              ))
+                            : generateAIReasoning().map((reason, idx) => (
+                                <div
+                                  key={idx}
+                                  className="text-sm text-gray-700 pl-4 border-l-2 border-blue-300 py-1"
+                                >
+                                  {reason}
+                                </div>
+                              ))}
+                          <div className="pt-3 mt-3 border-t border-gray-200 flex justify-between font-bold">
+                            <span>Final Price</span>
+                            <span className="text-blue-600">₹{formatPrice(apiPrice)}</span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Buttons */}
                     <div className="space-y-3">
                       <Button 
                         onClick={handleProceedToSell}
+                        disabled={!hasAiQuote || isLoading}
                         className="w-full h-14 text-lg rounded-2xl"
                       >
                         Proceed to Sell <ArrowRight className="ml-2" />
                       </Button>
+
+                      {!hasAiQuote ? (
+                        <Button
+                          variant="secondary"
+                          onClick={fetchPriceFromBackend}
+                          disabled={isLoading}
+                          className="w-full h-12 text-base rounded-2xl"
+                        >
+                          {isLoading ? "Fetching AI Price…" : "Retry AI Price"}
+                        </Button>
+                      ) : null}
                       
                       <Button
                         variant="outline"
