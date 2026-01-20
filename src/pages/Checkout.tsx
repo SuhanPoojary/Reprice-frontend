@@ -133,6 +133,7 @@ export default function Checkout() {
       state: {
         redirectTo: "/checkout",
         redirectState: location.state,
+        backgroundLocation: location,
       },
     });
   };

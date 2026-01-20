@@ -1,9 +1,11 @@
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 
 export default function NotFound() {
+  const location = useLocation();
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -22,7 +24,7 @@ export default function NotFound() {
             <Link to="/">
               <Button>Back to Home</Button>
             </Link>
-            <Link to="/login">
+            <Link to="/login" state={{ backgroundLocation: location }}>
               <Button variant="outline">Sell Your Phone</Button>
             </Link>
           </div>

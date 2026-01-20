@@ -321,6 +321,7 @@ export default function PhoneDetail() {
         state: {
           redirectTo: "/checkout",
           redirectState: checkoutState,
+          backgroundLocation: location,
         },
       });
       return;

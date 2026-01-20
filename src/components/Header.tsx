@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Phone, User, LogOut } from "lucide-react";
@@ -9,6 +9,7 @@ export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Add scroll event listener properly with useEffect
   useEffect(() => {
@@ -117,6 +118,7 @@ export function Header() {
                 >
                   <Link
                     to="/login"
+                    state={{ backgroundLocation: location }}
                     className="flex items-center cursor-pointer"
                   >
                     <User size={18} className="mr-1" />
@@ -209,7 +211,7 @@ export function Header() {
                           Login
                         </div>
                         <div className="grid gap-3">
-                          <Link to="/login">
+                          <Link to="/login" state={{ backgroundLocation: location }}>
                             <Button
                               variant="outline"
                               className="w-full justify-start"
