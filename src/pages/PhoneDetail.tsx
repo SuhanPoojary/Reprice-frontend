@@ -61,6 +61,25 @@ function formatVariant(variant: unknown): string | undefined {
   return raw;
 }
 
+function createPlaceholderSvgDataUri(label: string): string {
+  const safe = String(label || "Phone").slice(0, 40);
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="36" fill="url(#g)"/>
+  <rect x="120" y="70" width="160" height="260" rx="26" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.35)"/>
+  <circle cx="200" cy="100" r="7" fill="rgba(255,255,255,0.55)"/>
+  <text x="200" y="355" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="22" fill="white" text-anchor="middle" opacity="0.95">${safe}</text>
+</svg>`;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
 export default function PhoneDetail() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -125,7 +144,9 @@ export default function PhoneDetail() {
     name: passedPhone.name,
     brand: passedPhone.brand,
     variant: passedPhone.variant,
-    image: passedPhone.image || `https://placehold.co/200x200/3b82f6/white?text=${encodeURIComponent(passedPhone.brand + ' ' + passedPhone.name)}`,
+    image:
+      passedPhone.image ||
+      createPlaceholderSvgDataUri(`${passedPhone.brand} ${passedPhone.name}`),
     releaseYear: 2023,
     description: `Sell your ${passedPhone.name} for the best price.`,
     basePrice: passedPhone.maxPrice || 0,
@@ -419,18 +440,29 @@ export default function PhoneDetail() {
       }
     }
     if (deviceTurnsOn === "yes") {
-      reasons.push(`✓ Device powers on properly adds ₹2,000`);
+      reasons.push(`✓ Device powers on properly (better resale value)`);
     } else if (deviceTurnsOn === "no") {
       reasons.push(
         `• Device not turning on significantly reduces value by ₹8,000`
       );
     }
     if (hasOriginalBox === "yes") {
-      reasons.push(`✓ Original box included adds ₹1,000`);
+      reasons.push(`✓ Original box included (improves buyer trust)`);
+    } else if (hasOriginalBox === "no") {
+      reasons.push(`• No box (may reduce perceived condition)`);
     }
     if (hasOriginalBill === "yes") {
-      reasons.push(`✓ Original bill/invoice adds ₹1,500 (proof of authenticity)`);
+      reasons.push(`✓ Original bill/invoice (proof of authenticity)`);
+    } else if (hasOriginalBill === "no") {
+      reasons.push(`• No bill/invoice (verification may take longer)`);
     }
+
+    if (isUnderWarranty === "yes") {
+      reasons.push(`✓ Under warranty (better demand)`);
+    } else if (isUnderWarranty === "no") {
+      reasons.push(`• Out of warranty (typical depreciation)`);
+    }
+
     return reasons;
   };
 

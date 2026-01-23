@@ -1,5 +1,9 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { CheckCircle2, ShieldCheck, Zap } from "lucide-react";
 
 export default function HowItWorks() {
   return (
@@ -8,32 +12,66 @@ export default function HowItWorks() {
 
       <main className="flex-grow bg-gray-50">
         {/* Hero Section */}
-        <section className="bg-primary text-primary-foreground py-12">
-          <div className="container mx-auto px-4 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">
-              How MobileTrade Works
-            </h1>
-            <p className="text-xl opacity-90 max-w-2xl mx-auto">
-              Sell your old phone in 3 simple steps
-            </p>
+        <section className="bg-primary text-primary-foreground">
+          <div className="container mx-auto px-4 py-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-4">
+                  How MobileTrade Works
+                </h1>
+                <p className="text-lg md:text-xl opacity-90 max-w-xl">
+                  Get an AI-powered quote, schedule a free pickup, and receive instant payment.
+                </p>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm">
+                    <Zap className="h-4 w-4" /> Instant quote
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm">
+                    <ShieldCheck className="h-4 w-4" /> Secure process
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm">
+                    <CheckCircle2 className="h-4 w-4" /> No hidden deductions
+                  </span>
+                </div>
+
+                <div className="mt-8 flex gap-3">
+                  <Link to="/sell">
+                    <Button className="bg-white text-primary hover:bg-white/90">
+                      Get a quote
+                    </Button>
+                  </Link>
+                  <Link to="/contact">
+                    <Button variant="outline" className="border-white/40 text-white hover:bg-white/10">
+                      Contact support
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="relative">
+                <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-white/10 to-white/0 blur-xl" />
+                <img
+                  src="/images/slider2.jpg"
+                  alt="Selling flow"
+                  className="relative w-full rounded-2xl shadow-xl object-cover max-h-[360px]"
+                />
+              </div>
+            </div>
           </div>
         </section>
 
         {/* Process Steps */}
-        <section className="py-16">
+        <section className="py-14">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
               {/* Step 1 */}
               <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mb-16">
                 <div className="md:col-span-2 order-2 md:order-1">
                   <img
-                    src="/assets/how-it-works-1.png"
+                    src="/images/slider1.jpg"
                     alt="Get a quote"
                     className="w-full rounded-lg shadow-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://placehold.co/600x400?text=Get+a+Quote";
-                    }}
                   />
                 </div>
                 <div className="md:col-span-3 order-1 md:order-2">
@@ -44,15 +82,11 @@ export default function HowItWorks() {
                     <h2 className="text-2xl font-bold">Get an Instant Quote</h2>
                   </div>
                   <p className="text-gray-600 mb-4">
-                    Select your phone's brand and model from our extensive
-                    catalog. Answer a few simple questions about its condition,
-                    such as whether the screen is cracked, if there are dents,
-                    or if there are functionality issues.
+                    Choose your brand & model, then answer a few quick condition questions.
+                    Our AI-assisted pricing uses your answers to generate a fair quote.
                   </p>
                   <p className="text-gray-600">
-                    Based on your responses, our advanced algorithm will
-                    calculate the best possible price for your device instantly.
-                    No waiting, no haggling, just a fair and transparent offer.
+                    You see the price breakdown up-front — no waiting, no haggling, and no last-minute surprises.
                   </p>
                   <div className="mt-6 p-4 bg-primary/10 rounded-lg">
                     <h3 className="font-semibold mb-2">Pro Tips:</h3>
@@ -62,11 +96,10 @@ export default function HowItWorks() {
                         pricing
                       </li>
                       <li>
-                        Have your IMEI number ready for a more precise quote
+                        Keep your storage/variant details handy
                       </li>
                       <li>
-                        Check if any accessories like chargers can increase your
-                        offer
+                        Include original box/bill if available
                       </li>
                     </ul>
                   </div>
@@ -116,13 +149,9 @@ export default function HowItWorks() {
                 </div>
                 <div className="md:col-span-2">
                   <img
-                    src="/assets/how-it-works-2.png"
+                    src="/images/slider3.jpg"
                     alt="Schedule pickup"
                     className="w-full rounded-lg shadow-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://placehold.co/600x400?text=Schedule+Pickup";
-                    }}
                   />
                 </div>
               </div>
@@ -131,13 +160,9 @@ export default function HowItWorks() {
               <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
                 <div className="md:col-span-2 order-2 md:order-1">
                   <img
-                    src="/assets/how-it-works-3.png"
+                    src="/images/slider4.jpg"
                     alt="Get paid"
                     className="w-full rounded-lg shadow-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://placehold.co/600x400?text=Get+Paid";
-                    }}
                   />
                 </div>
                 <div className="md:col-span-3 order-1 md:order-2">
@@ -223,8 +248,34 @@ export default function HowItWorks() {
           </div>
         </section>
 
+        {/* Mini highlight cards */}
+        <section className="py-10 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-lg font-semibold">AI quote</div>
+                  <div className="text-sm text-gray-600 mt-1">Pricing adapts to condition and variant.</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-lg font-semibold">Free pickup</div>
+                  <div className="text-sm text-gray-600 mt-1">Schedule at your convenience.</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-lg font-semibold">Instant payment</div>
+                  <div className="text-sm text-gray-600 mt-1">Get paid right after inspection.</div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
         {/* FAQ Section */}
-        <section className="py-12 bg-white">
+        <section className="py-12 bg-gray-50">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10">
               <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
