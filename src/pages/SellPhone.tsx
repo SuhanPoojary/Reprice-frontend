@@ -56,6 +56,7 @@ interface Phone {
   image: string;
   maxPrice: number;
   variant?: string;
+  variants?: Array<{ variant: string; price: number }>;
 }
 
 interface BrandItem {
@@ -70,6 +71,18 @@ function toSlug(input: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function displayPhoneName(brand: string, model: string) {
+  const b = (brand || "").trim();
+  const m = (model || "").trim();
+  if (!b) return m;
+  if (!m) return b;
+
+  // Some sources repeat brand inside model (e.g., brand: 'Redmi', model: 'Redmi 9 A').
+  // Avoid showing 'Redmi Redmi 9 A'.
+  if (m.toLowerCase().startsWith(b.toLowerCase())) return m;
+  return `${b} ${m}`;
 }
 
 function uniqByKey<T>(items: T[], getKey: (item: T) => string) {
@@ -246,6 +259,15 @@ export default function SellPhone() {
           image: String(p.image ?? ""),
           maxPrice: Number(p.maxPrice ?? 0),
           variant: typeof p.variant === "string" ? p.variant : undefined,
+          variants: Array.isArray(p.variants)
+            ? p.variants
+                .filter(Boolean)
+                .map((v: any) => ({
+                  variant: String(v.variant ?? "").trim(),
+                  price: Number(v.price ?? 0),
+                }))
+                .filter((v: any) => v.variant && Number.isFinite(v.price) && v.price > 0)
+            : undefined,
         }))
         .filter((p) => p.id && p.name && p.brand);
       return safe.slice(0, POPULAR_LIMIT);
@@ -334,44 +356,67 @@ export default function SellPhone() {
   };
 
   const mapBackendPhones = (data: BackendPhone[]) => {
-    // Auto-fill missing variants using the first available variant per (brand, model).
-    const firstVariantByModel = new Map<string, string>();
+    // Group variants under the same (brand, model) so the list shows one card per model.
+    const grouped = new Map<
+      string,
+      { phone: Phone; variants: Map<string, { variant: string; price: number }> }
+    >();
+
     for (const item of data) {
       const brand = (item.brand || "").trim();
       const model = (item.model || "").trim();
       if (!brand || !model) continue;
-      const v = formatVariant(item.variant);
-      if (!v) continue;
+
       const key = `${brand.toLowerCase()}|${model.toLowerCase()}`;
-      if (!firstVariantByModel.has(key)) firstVariantByModel.set(key, v);
+      const maxPrice = Number(item.price ?? 0) || 0;
+      const image = (item.image || item.link || "").toString();
+
+      const variant = formatVariant(item.variant);
+
+      const entry = grouped.get(key);
+      if (!entry) {
+        const phone: Phone = {
+          id: `${toSlug(brand)}-${toSlug(model)}`,
+          name: displayPhoneName(brand, model),
+          brand,
+          variant: undefined,
+          maxPrice,
+          image,
+          variants: [],
+        };
+        const variantsMap = new Map<string, { variant: string; price: number }>();
+        if (variant) {
+          variantsMap.set(variant.toLowerCase(), { variant, price: maxPrice });
+        }
+        grouped.set(key, { phone, variants: variantsMap });
+        continue;
+      }
+
+      // Keep the best (highest) price across variants.
+      if (maxPrice > (entry.phone.maxPrice ?? 0)) {
+        entry.phone.maxPrice = maxPrice;
+      }
+
+      // Keep first non-empty image.
+      if (!entry.phone.image && image) {
+        entry.phone.image = image;
+      }
+
+      // Merge variants (keep highest price for same variant label)
+      if (variant) {
+        const vKey = variant.toLowerCase();
+        const existingVariant = entry.variants.get(vKey);
+        if (!existingVariant || maxPrice > existingVariant.price) {
+          entry.variants.set(vKey, { variant, price: maxPrice });
+        }
+      }
     }
 
-    const mapped = data
-      .map((item, idx) => {
-        const brand = (item.brand || "").trim();
-        const model = (item.model || "").trim();
-        if (!brand || !model) return null;
-
-        const key = `${brand.toLowerCase()}|${model.toLowerCase()}`;
-        const variant =
-          formatVariant(item.variant) ?? firstVariantByModel.get(key) ?? undefined;
-
-        const id = `${toSlug(brand)}-${toSlug(model)}-${toSlug(variant ?? "na")}-${idx}`;
-        return {
-          id,
-          name: `${brand} ${model}`,
-          brand,
-          variant,
-          maxPrice: item.price,
-          image: item.image || item.link || "",
-        } satisfies Phone;
-      })
-      .filter(Boolean) as Phone[];
-
-    return uniqByKey(
-      mapped,
-      (p) => `${p.brand.toLowerCase()}|${p.name.toLowerCase()}|${p.variant ?? ""}`
-    );
+    return Array.from(grouped.values()).map((e) => {
+      const variants = Array.from(e.variants.values()).sort((a, b) => a.price - b.price);
+      e.phone.variants = variants;
+      return e.phone;
+    });
   };
 
   const sortPhones = (phones: Phone[]) => {
@@ -761,11 +806,7 @@ export default function SellPhone() {
                                   {phone.name}
                                 </h3>
 
-                                {phone.variant && formatVariant(phone.variant) && (
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    {phone.brand.toUpperCase()} : {formatVariant(phone.variant)}
-                                  </p>
-                                )}
+                                {/* Variants are selected on the next screen */}
                                 <div className="pt-2">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-lg font-bold text-gray-900">
@@ -854,11 +895,7 @@ export default function SellPhone() {
                                       {phone.name}
                                     </h3>
 
-                                    {phone.variant && formatVariant(phone.variant) && (
-                                      <p className="text-xs text-gray-600 font-medium">
-                                        {phone.brand.toUpperCase()} : {formatVariant(phone.variant)}
-                                      </p>
-                                    )}
+                                    {/* Variants are selected on the next screen */}
                                     <div className="pt-2">
                                       <div className="flex items-center justify-between gap-2">
                                         <p className="text-lg font-bold text-gray-900">

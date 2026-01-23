@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
+import { fetchSearchPhonesRaw } from "@/lib/phoneSearchApi";
 import {
   Check,
   ArrowRight,
@@ -48,6 +49,14 @@ const AI_FALLBACK_URL = "https://reprice-ml3.onrender.com";
 
 type BackendStatus = "unknown" | "ready" | "initializing" | "down";
 
+type VariantOption = {
+  key: string;
+  rawVariant: string;
+  ramGb?: number;
+  storageGb?: number;
+  price: number;
+};
+
 function formatVariant(variant: unknown): string | undefined {
   if (typeof variant !== "string") return undefined;
   const raw = variant.trim();
@@ -59,6 +68,58 @@ function formatVariant(variant: unknown): string | undefined {
   if (compactGb) return `${compactGb[1]}/${compactGb[3]}`;
 
   return raw;
+}
+
+function parseVariantToRamStorageGb(variant: string): { ramGb?: number; storageGb?: number } {
+  const raw = String(variant || "").trim();
+  if (!raw) return {};
+
+  const compact = raw.replace(/\s+/g, "");
+  const matchPair = compact.match(/^(\d+)(GB)?\/(\d+)(GB)?$/i);
+  if (matchPair) {
+    const ramGb = Number(matchPair[1]);
+    const storageGb = Number(matchPair[3]);
+    return {
+      ramGb: Number.isFinite(ramGb) ? ramGb : undefined,
+      storageGb: Number.isFinite(storageGb) ? storageGb : undefined,
+    };
+  }
+
+  const matchStorageOnly = compact.match(/^(\d+)(GB)?$/i);
+  if (matchStorageOnly) {
+    const storageGb = Number(matchStorageOnly[1]);
+    return { storageGb: Number.isFinite(storageGb) ? storageGb : undefined };
+  }
+
+  return {};
+}
+
+function normalizeModelText(value: string) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function stripBrandPrefix(model: string, brand: string) {
+  const m = String(model || "").trim();
+  const b = String(brand || "").trim();
+  if (!m || !b) return m;
+  if (m.toLowerCase().startsWith(b.toLowerCase())) {
+    return m.slice(b.length).trim();
+  }
+  return m;
+}
+
+function variantLabel(option: Pick<VariantOption, "ramGb" | "storageGb" | "rawVariant">): string {
+  if (typeof option.ramGb === "number" && typeof option.storageGb === "number") {
+    return `${option.ramGb}GB RAM / ${option.storageGb}GB`;
+  }
+  if (typeof option.storageGb === "number") {
+    return `${option.storageGb}GB`;
+  }
+  return option.rawVariant;
 }
 
 function createPlaceholderSvgDataUri(label: string): string {
@@ -85,6 +146,11 @@ export default function PhoneDetail() {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
   const passedPhone = location.state?.phoneData;
+
+  const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
+  const [selectedVariantKey, setSelectedVariantKey] = useState<string>("");
+  const [isVariantLoading, setIsVariantLoading] = useState(false);
+  const [variantError, setVariantError] = useState<string | null>(null);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedScreenCondition, setSelectedScreenCondition] = useState("");
@@ -127,6 +193,9 @@ export default function PhoneDetail() {
   });
 
   const pricingSupportKey = `reprice.aiPricingSupported.v1.${aiBaseUrl}`;
+
+  type PassedVariant = { variant: string; price: number };
+  const passedVariants = (passedPhone as any)?.variants as PassedVariant[] | undefined;
 
   if (!passedPhone) {
     return (
@@ -183,6 +252,236 @@ export default function PhoneDetail() {
       },
     ],
   };
+
+  // Fetch variants for this model and let user choose RAM/Storage.
+  useEffect(() => {
+    let cancelled = false;
+
+    const initVariants = async () => {
+      const brand = String(passedPhone?.brand ?? "").trim();
+      const fullName = String(passedPhone?.name ?? "").trim();
+      const currentVariant = formatVariant(passedPhone?.variant) ?? "";
+      const currentPrice = Number(passedPhone?.maxPrice ?? 0) || 0;
+
+      if (!brand || !fullName) return;
+
+      // If Sell page provided variants, prefer those (no network dependency).
+      if (Array.isArray(passedVariants) && passedVariants.length > 0) {
+        const map = new Map<string, VariantOption>();
+        for (const v of passedVariants) {
+          const raw = formatVariant(v?.variant) ?? "";
+          const price = Number(v?.price ?? 0) || 0;
+          if (!raw || !Number.isFinite(price) || price <= 0) continue;
+          const { ramGb, storageGb } = parseVariantToRamStorageGb(raw);
+          const key = raw.toLowerCase();
+          const existing = map.get(key);
+          if (!existing || price > existing.price) {
+            map.set(key, { key, rawVariant: raw, ramGb, storageGb, price });
+          }
+        }
+
+        // Ensure currently selected variant exists.
+        if (currentVariant) {
+          const key = currentVariant.toLowerCase();
+          if (!map.has(key)) {
+            const { ramGb, storageGb } = parseVariantToRamStorageGb(currentVariant);
+            map.set(key, {
+              key,
+              rawVariant: currentVariant,
+              ramGb,
+              storageGb,
+              price: currentPrice,
+            });
+          }
+        }
+
+        const options = Array.from(map.values()).sort((a, b) => {
+          const ar = a.ramGb ?? 0;
+          const br = b.ramGb ?? 0;
+          if (ar !== br) return ar - br;
+          const as = a.storageGb ?? 0;
+          const bs = b.storageGb ?? 0;
+          if (as !== bs) return as - bs;
+          return (a.price ?? 0) - (b.price ?? 0);
+        });
+
+        if (!cancelled) {
+          setVariantOptions(options);
+
+          const matchedCurrent =
+            currentVariant && options.find((o) => o.key === currentVariant.toLowerCase())?.key;
+
+          // Require explicit user selection when variants exist.
+          // Only restore selection if we already have one or if a specific variant was passed.
+          if (matchedCurrent) {
+            setSelectedVariantKey((prev) => prev || matchedCurrent);
+          }
+        }
+
+        return;
+      }
+
+      setIsVariantLoading(true);
+      setVariantError(null);
+
+      try {
+        const modelOnly = fullName
+          .replace(new RegExp(`^${brand.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\s+`, "i"), "")
+          .trim();
+
+        const results = await fetchSearchPhonesRaw(fullName);
+
+        const normalizedBrand = normalizeModelText(brand);
+        const desiredModelKey = normalizeModelText(
+          stripBrandPrefix(modelOnly || fullName, brand)
+        );
+
+        const map = new Map<string, VariantOption>();
+
+        for (const r of results) {
+          const rBrand = String((r as any)?.brand ?? "").trim();
+          const rModel = String((r as any)?.model ?? "").trim();
+          const variant = formatVariant((r as any)?.variant);
+          const price = Number((r as any)?.price ?? 0) || 0;
+
+          if (!rBrand || !rModel || !variant) continue;
+          if (normalizeModelText(rBrand) !== normalizedBrand) continue;
+
+          const rModelKey = normalizeModelText(stripBrandPrefix(rModel, brand));
+          if (rModelKey !== desiredModelKey) continue;
+          if (!price || !Number.isFinite(price)) continue;
+
+          const { ramGb, storageGb } = parseVariantToRamStorageGb(variant);
+          const key = variant.toLowerCase();
+          const existing = map.get(key);
+          if (!existing || price > existing.price) {
+            map.set(key, {
+              key,
+              rawVariant: variant,
+              ramGb,
+              storageGb,
+              price,
+            });
+          }
+        }
+
+        // Ensure the currently selected variant is always available as an option.
+        if (currentVariant) {
+          const key = currentVariant.toLowerCase();
+          if (!map.has(key)) {
+            const { ramGb, storageGb } = parseVariantToRamStorageGb(currentVariant);
+            map.set(key, {
+              key,
+              rawVariant: currentVariant,
+              ramGb,
+              storageGb,
+              price: currentPrice,
+            });
+          }
+        }
+
+        const options = Array.from(map.values()).sort((a, b) => {
+          // Sort by RAM, then storage, then price
+          const ar = a.ramGb ?? 0;
+          const br = b.ramGb ?? 0;
+          if (ar !== br) return ar - br;
+          const as = a.storageGb ?? 0;
+          const bs = b.storageGb ?? 0;
+          if (as !== bs) return as - bs;
+          return (a.price ?? 0) - (b.price ?? 0);
+        });
+
+        if (!cancelled) {
+          setVariantOptions(options);
+
+          const matchedCurrent =
+            currentVariant && options.find((o) => o.key === currentVariant.toLowerCase())?.key;
+
+          // Require explicit user selection when variants exist.
+          if (matchedCurrent) {
+            setSelectedVariantKey((prev) => prev || matchedCurrent);
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setVariantError("Unable to load variants. You can continue with the auto-detected option.");
+        }
+      } finally {
+        if (!cancelled) setIsVariantLoading(false);
+      }
+    };
+
+    void initVariants();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passedPhone?.id, passedVariants]);
+
+  const selectedVariantOption = useMemo(() => {
+    if (!selectedVariantKey) return null;
+    return variantOptions.find((o) => o.key === selectedVariantKey) ?? null;
+  }, [selectedVariantKey, variantOptions]);
+
+  const effectiveVariant = selectedVariantOption?.rawVariant ?? formatVariant(passedPhone?.variant) ?? undefined;
+  const effectiveBasePrice =
+    (selectedVariantOption?.price ?? Number(passedPhone?.maxPrice ?? 0)) || 0;
+
+  const effectiveScreenConditions = useMemo(() => {
+    const base = effectiveBasePrice;
+    return [
+      {
+        id: "good",
+        name: "Good",
+        description: "No scratches, pristine condition",
+        priceAdjustment: 0,
+      },
+      {
+        id: "minor-scratches",
+        name: "Minor Scratches",
+        description: "Light scratches, barely visible",
+        priceAdjustment: -Math.round(base * 0.1),
+      },
+      {
+        id: "major-scratches",
+        name: "Major Scratches",
+        description: "Visible scratches across screen",
+        priceAdjustment: -Math.round(base * 0.25),
+      },
+      {
+        id: "cracked",
+        name: "Cracked",
+        description: "Screen has cracks but functional",
+        priceAdjustment: -Math.round(base * 0.5),
+      },
+      {
+        id: "shattered",
+        name: "Shattered",
+        description: "Severely damaged screen",
+        priceAdjustment: -Math.round(base * 0.75),
+      },
+    ];
+  }, [effectiveBasePrice]);
+
+  const ramChoices = useMemo(() => {
+    const set = new Set<number>();
+    for (const o of variantOptions) {
+      if (typeof o.ramGb === "number" && Number.isFinite(o.ramGb)) set.add(o.ramGb);
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [variantOptions]);
+
+  const storageChoices = useMemo(() => {
+    const set = new Set<number>();
+    const targetRam = selectedVariantOption?.ramGb;
+    for (const o of variantOptions) {
+      if (typeof o.storageGb !== "number" || !Number.isFinite(o.storageGb)) continue;
+      if (typeof targetRam === "number" && typeof o.ramGb === "number" && o.ramGb !== targetRam) continue;
+      set.add(o.storageGb);
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [variantOptions, selectedVariantOption?.ramGb]);
 
 
 
@@ -244,11 +543,13 @@ export default function PhoneDetail() {
 
   const buildQuoteKey = () => {
     const screenCondition =
-      phone.screenConditions.find((s) => s.id === selectedScreenCondition)
-        ?.name || "Good";
+      effectiveScreenConditions.find((s) => s.id === selectedScreenCondition)?.name ||
+      "Good";
+
+    const modelNameWithVariant = `${phone.name}${effectiveVariant ? ` ${effectiveVariant}` : ""}`;
 
     return JSON.stringify({
-      model_name: phone.name,
+      model_name: modelNameWithVariant,
       turns_on: deviceTurnsOn === "yes",
       screen_condition: screenCondition,
       has_box: hasOriginalBox === "yes",
@@ -416,6 +717,7 @@ export default function PhoneDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentStep,
+    selectedVariantKey,
     selectedScreenCondition,
     deviceTurnsOn,
     hasOriginalBox,
@@ -427,7 +729,7 @@ export default function PhoneDetail() {
 
   const generateAIReasoning = () => {
     const reasons: string[] = [];
-    const screenOption = phone.screenConditions.find(
+    const screenOption = effectiveScreenConditions.find(
       (s) => s.id === selectedScreenCondition
     );
     if (screenOption) {
@@ -467,7 +769,13 @@ export default function PhoneDetail() {
   };
 
   const canProceed = () => {
-    if (currentStep === 1) return true;
+    if (currentStep === 1) {
+      // If multiple variants exist, require an explicit selection before continuing.
+      if (variantOptions.length > 1) {
+        return Boolean(selectedVariantKey);
+      }
+      return true;
+    }
     if (currentStep === 2)
       return (
         selectedScreenCondition !== "" &&
@@ -490,9 +798,9 @@ export default function PhoneDetail() {
         id: phone.id,
         name: phone.name,
         brand: phone.brand,
-        variant: phone.variant ?? "N/A",
+        variant: effectiveVariant ?? "N/A",
         condition:
-          phone.screenConditions.find((s) => s.id === selectedScreenCondition)
+          effectiveScreenConditions.find((s) => s.id === selectedScreenCondition)
             ?.name ?? "Good",
         price: apiPrice,
         maxPrice: apiPrice,
@@ -566,10 +874,10 @@ export default function PhoneDetail() {
                   {currentStep === 1 && (
                     <>
                       <h1 className="text-4xl lg:text-5xl font-bold mb-4 text-gray-900">
-                        Confirm your phone variant
+                        Select your phone variant
                       </h1>
                       <p className="text-gray-600 text-lg">
-                        Variant is auto-detected for this model
+                        Choose RAM & storage to get the right quote
                       </p>
                     </>
                   )}
@@ -613,12 +921,12 @@ export default function PhoneDetail() {
                         <h3 className="font-bold text-lg">{phone.name}</h3>
                         <p className="text-sm text-gray-600">
                           {phone.brand} • {(() => {
-                            const variant = formatVariant(phone.variant);
+                            const variant = effectiveVariant;
                             return variant ? variant : '';
                           })()}{(() => {
-                            const variant = formatVariant(phone.variant);
+                            const variant = effectiveVariant;
                             return variant ? 'GB' : '';
-                          })()}{currentStep === 3 && selectedScreenCondition && ` • ${phone.screenConditions.find(s => s.id === selectedScreenCondition)?.name}`}
+                          })()}{currentStep === 3 && selectedScreenCondition && ` • ${effectiveScreenConditions.find(s => s.id === selectedScreenCondition)?.name}`}
                         </p>
                         {apiPrice !== null ? (
                           <p className="text-sm font-semibold text-blue-600 mt-1">
@@ -650,16 +958,155 @@ export default function PhoneDetail() {
                 {/* Step 1: Variant */}
                 {currentStep === 1 && (
                   <Card className="bg-white/60 backdrop-blur border-0 shadow-lg">
-                    <CardContent className="p-6">
+                    <CardContent className="p-6 space-y-4">
                       <div className="flex items-center gap-3">
                         <HardDrive className="h-5 w-5 text-blue-600" />
                         <div>
                           <div className="text-sm text-gray-500">Variant</div>
                           <div className="font-semibold text-gray-900">
-                            {formatVariant(phone.variant) ?? "N/A"}
+                            {effectiveVariant ?? "Please select"}
                           </div>
                         </div>
                       </div>
+
+                      {variantError ? (
+                        <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                          {variantError}
+                        </div>
+                      ) : null}
+
+                      {isVariantLoading ? (
+                        <div className="text-sm text-gray-600">Loading variants...</div>
+                      ) : variantOptions.length > 1 ? (
+                        <div className="space-y-4">
+                          {!selectedVariantKey ? (
+                            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                              Please select a RAM/Storage variant to continue.
+                            </div>
+                          ) : null}
+
+                          {ramChoices.length > 1 ? (
+                            <div>
+                              <div className="text-sm font-semibold text-gray-700 mb-2">RAM</div>
+                              <RadioGroup
+                                value={
+                                  typeof selectedVariantOption?.ramGb === "number"
+                                    ? String(selectedVariantOption.ramGb)
+                                    : ""
+                                }
+                                onValueChange={(v) => {
+                                  const nextRam = Number(v);
+                                  const preferredStorage = selectedVariantOption?.storageGb;
+
+                                  const exact = variantOptions.find(
+                                    (o) =>
+                                      o.ramGb === nextRam &&
+                                      (typeof preferredStorage !== "number" || o.storageGb === preferredStorage)
+                                  );
+                                  const fallback = variantOptions.find((o) => o.ramGb === nextRam);
+                                  const next = exact ?? fallback;
+                                  if (next) setSelectedVariantKey(next.key);
+                                }}
+                                className="grid grid-cols-2 gap-3"
+                              >
+                                {ramChoices.map((ram) => (
+                                  <div key={ram}>
+                                    <RadioGroupItem
+                                      value={String(ram)}
+                                      id={`ram-${ram}`}
+                                      className="peer sr-only"
+                                    />
+                                    <Label
+                                      htmlFor={`ram-${ram}`}
+                                      className="flex items-center justify-center border-2 rounded-2xl p-4 cursor-pointer peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 hover:bg-white/80 bg-white/60 backdrop-blur transition-all"
+                                    >
+                                      <span className="font-semibold">{ram}GB</span>
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          ) : null}
+
+                          {storageChoices.length > 1 ? (
+                            <div>
+                              <div className="text-sm font-semibold text-gray-700 mb-2">Storage</div>
+                              <RadioGroup
+                                value={
+                                  typeof selectedVariantOption?.storageGb === "number"
+                                    ? String(selectedVariantOption.storageGb)
+                                    : ""
+                                }
+                                onValueChange={(v) => {
+                                  const nextStorage = Number(v);
+                                  const preferredRam = selectedVariantOption?.ramGb;
+
+                                  const exact = variantOptions.find(
+                                    (o) =>
+                                      o.storageGb === nextStorage &&
+                                      (typeof preferredRam !== "number" || o.ramGb === preferredRam)
+                                  );
+                                  const fallback = variantOptions.find((o) => o.storageGb === nextStorage);
+                                  const next = exact ?? fallback;
+                                  if (next) setSelectedVariantKey(next.key);
+                                }}
+                                className="grid grid-cols-2 gap-3"
+                              >
+                                {storageChoices.map((storage) => (
+                                  <div key={storage}>
+                                    <RadioGroupItem
+                                      value={String(storage)}
+                                      id={`storage-${storage}`}
+                                      className="peer sr-only"
+                                    />
+                                    <Label
+                                      htmlFor={`storage-${storage}`}
+                                      className="flex items-center justify-center border-2 rounded-2xl p-4 cursor-pointer peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 hover:bg-white/80 bg-white/60 backdrop-blur transition-all"
+                                    >
+                                      <span className="font-semibold">{storage}GB</span>
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          ) : null}
+
+                          {/* Fallback: show full variant list when parsing isn't helpful */}
+                          {ramChoices.length <= 1 && storageChoices.length <= 1 ? (
+                            <div>
+                              <div className="text-sm font-semibold text-gray-700 mb-2">Choose Variant</div>
+                              <RadioGroup
+                                value={selectedVariantKey}
+                                onValueChange={setSelectedVariantKey}
+                                className="space-y-2"
+                              >
+                                {variantOptions.map((o) => (
+                                  <div key={o.key}>
+                                    <RadioGroupItem
+                                      value={o.key}
+                                      id={`variant-${o.key}`}
+                                      className="peer sr-only"
+                                    />
+                                    <Label
+                                      htmlFor={`variant-${o.key}`}
+                                      className="flex items-center justify-between gap-3 border-2 rounded-2xl p-4 cursor-pointer peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 hover:bg-white/80 bg-white/60 backdrop-blur transition-all"
+                                    >
+                                      <span className="font-semibold">{variantLabel(o)}</span>
+                                      <span className="text-sm text-gray-600">₹{formatPrice(o.price)}</span>
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          ) : null}
+
+                          <div className="text-xs text-gray-500">
+                            Base price for selected variant: ₹{formatPrice(effectiveBasePrice)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">Variant is auto-detected for this model.</div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -677,7 +1124,7 @@ export default function PhoneDetail() {
                         onValueChange={setSelectedScreenCondition}
                         className="space-y-3"
                       >
-                        {phone.screenConditions.map((condition) => (
+                        {effectiveScreenConditions.map((condition) => (
                           <div key={condition.id}>
                             <RadioGroupItem
                               value={condition.id}
@@ -918,7 +1365,7 @@ export default function PhoneDetail() {
                           <span className="text-gray-600">Model Base</span>
                           <span className="font-semibold">
                             ₹
-                            {formatPrice(apiBasePrice ?? phone.basePrice)}
+                            {formatPrice(apiBasePrice ?? effectiveBasePrice)}
                           </span>
                         </div>
                         {apiLogs.length > 0

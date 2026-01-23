@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/sonner";
 import {
   Select,
   SelectContent,
@@ -247,8 +248,10 @@ export default function Checkout() {
       if (data.order && data.order.id) {
         localStorage.setItem('lastOrderId', data.order.id);
       }
-      setStep(3);
-      window.scrollTo(0, 0);
+      toast.success("Order placed successfully", {
+        description: "Redirecting you to Sell Phone…",
+      });
+      navigate("/sell", { replace: true });
     } catch (err) {
     console.error("Checkout error:", err);
     alert(
@@ -258,6 +261,19 @@ export default function Checkout() {
     setIsSubmitting(false);
   }
 };
+
+  // After placing an order, redirect back to Sell Phone page.
+  useEffect(() => {
+    if (step !== 3) return;
+
+    const t = window.setTimeout(() => {
+      navigate("/sell", { replace: true });
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [step, navigate]);
 
 console.log("CHECKOUT STATE:", location.state);
 
@@ -895,10 +911,10 @@ console.log("CHECKOUT STATE:", location.state);
 
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button
-                          onClick={() => navigate("/")}
+                          onClick={() => navigate("/sell")}
                           className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                         >
-                          Back to Home
+                          Sell Another Phone
                         </Button>
                         <Button
   variant="outline"
@@ -914,6 +930,10 @@ console.log("CHECKOUT STATE:", location.state);
 >
   View Order Details
 </Button>
+                      </div>
+
+                      <div className="mt-3 text-center text-xs text-gray-500">
+                        Redirecting you to Sell Phone page in a few seconds...
                       </div>
                     </div>
                   </div>
