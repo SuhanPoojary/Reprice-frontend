@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Carousel,
   CarouselContent,
@@ -15,7 +22,7 @@ import {
 import { Search, ArrowRight, Heart } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import Autoplay from "embla-carousel-autoplay";
-import { fetchSearchPhonesRaw, warmupPhoneSearch } from "@/lib/phoneSearchApi";
+import { useAuth } from "@/context/AuthContext";
 
 function formatVariant(variant?: string) {
   if (!variant) return null;
@@ -29,8 +36,7 @@ function formatVariant(variant?: string) {
   return raw;
 }
 
-const DEFAULT_CACHE_KEY = "sellPhone:defaultPhones:v1";
-const DEFAULT_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24h
+console.log("🔥 THIS SellPhone FILE IS LOADED");
 
 /* ================= TYPES ================= */
 
@@ -40,6 +46,7 @@ interface BackendPhone {
   variant?: string;
   price: number;
   image?: string;
+  link?: string;
 }
 
 interface Phone {
@@ -105,34 +112,6 @@ function pickDiverseByBrand(items: Phone[], limit: number) {
   return result.slice(0, limit);
 }
 
-type DefaultCachePayload = {
-  ts: number;
-  phones: Phone[];
-  brands: BrandItem[];
-};
-
-function readDefaultCache(): DefaultCachePayload | null {
-  try {
-    const raw = localStorage.getItem(DEFAULT_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DefaultCachePayload;
-    if (!parsed || typeof parsed.ts !== "number") return null;
-    if (!Array.isArray(parsed.phones) || !Array.isArray(parsed.brands)) return null;
-    if (Date.now() - parsed.ts > DEFAULT_CACHE_TTL_MS) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeDefaultCache(payload: DefaultCachePayload) {
-  try {
-    localStorage.setItem(DEFAULT_CACHE_KEY, JSON.stringify(payload));
-  } catch {
-    // ignore
-  }
-}
-
 /* ================= DATA ================= */
 
 function brandLogoCandidates(brandId: string) {
@@ -162,75 +141,6 @@ const SLIDER_IMAGES = [
   "/images/slider2.jpg",
   "/images/slider3.jpg",
   "/images/slider4.jpg",
-];
-
-// Immediate UI fallback so the page doesn't look empty during cold starts.
-// Prices are placeholders until the API responds.
-const PLACEHOLDER_POPULAR_PHONES: Phone[] = [
-  {
-    id: "placeholder-iphone-13",
-    name: "Apple iPhone 13",
-    brand: "Apple",
-    variant: "128GB/4GB",
-    maxPrice: 0,
-    image: "/assets/phones/iphone-13-pro.png",
-  },
-  {
-    id: "placeholder-iphone-12",
-    name: "Apple iPhone 12",
-    brand: "Apple",
-    variant: "128GB/4GB",
-    maxPrice: 0,
-    image: "/assets/phones/iphone-12.png",
-  },
-  {
-    id: "placeholder-galaxy-s21",
-    name: "Samsung Galaxy S21",
-    brand: "Samsung",
-    variant: "128GB/8GB",
-    maxPrice: 0,
-    image: "/assets/phones/galaxy-s21.png",
-  },
-  {
-    id: "placeholder-oneplus-9",
-    name: "OnePlus 9",
-    brand: "OnePlus",
-    variant: "128GB/8GB",
-    maxPrice: 0,
-    image: "/assets/phones/oneplus9-pro.png",
-  },
-  {
-    id: "placeholder-pixel-6",
-    name: "Google Pixel 6",
-    brand: "Google",
-    variant: "128GB/8GB",
-    maxPrice: 0,
-    image: "/assets/phones/pixel6-pro.png",
-  },
-  {
-    id: "placeholder-mi-11",
-    name: "Xiaomi Mi 11",
-    brand: "Xiaomi",
-    variant: "128GB/8GB",
-    maxPrice: 0,
-    image: "/assets/phones/mi11.png",
-  },
-  {
-    id: "placeholder-oppo-findx3",
-    name: "OPPO Find X3",
-    brand: "OPPO",
-    variant: "256GB/12GB",
-    maxPrice: 0,
-    image: "/assets/phones/oppo-findx3.png",
-  },
-  {
-    id: "placeholder-vivo",
-    name: "Vivo",
-    brand: "Vivo",
-    variant: "128GB/8GB",
-    maxPrice: 0,
-    image: "/assets/phones/vivo.png",
-  },
 ];
 
 const STATIC_BRAND_NAMES = [
@@ -291,12 +201,17 @@ function mergeBrands(preferred: BrandItem[], fallback: BrandItem[]) {
 
 export default function SellPhone() {
   const location = useLocation();
+  const { user, isLoggedIn } = useAuth();
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [defaultPhones, setDefaultPhones] = useState<Phone[]>(() => PLACEHOLDER_POPULAR_PHONES);
-  const [filteredPhones, setFilteredPhones] = useState<Phone[]>(() => PLACEHOLDER_POPULAR_PHONES);
+  const [defaultPhones, setDefaultPhones] = useState<Phone[]>([]);
+  const [filteredPhones, setFilteredPhones] = useState<Phone[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [isDefaultLoading, setIsDefaultLoading] = useState<boolean>(true);
   const [defaultError, setDefaultError] = useState<string>("");
+  const [searchError, setSearchError] = useState<string>("");
+
+  type SortOrder = "none" | "price-asc" | "price-desc";
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
 
   const [brands, setBrands] = useState<BrandItem[]>(() => buildStaticBrands());
   const [selectedBrand, setSelectedBrand] = useState<BrandItem | null>(null);
@@ -307,59 +222,188 @@ export default function SellPhone() {
   const [activeTab, setActiveTab] = useState<"popular" | "brands">("popular");
   const [pendingBrandId, setPendingBrandId] = useState<string | null>(null);
 
-  const searchAbortRef = useRef<AbortController | null>(null);
-  const brandAbortRef = useRef<AbortController | null>(null);
+  const POPULAR_LIMIT = 10;
+  const POPULAR_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
+  const popularCacheKey = useMemo(() => {
+    const userKey = isLoggedIn && user?.id ? String(user.id) : "guest";
+    return `reprice.popularPhones.v1.${userKey}`;
+  }, [isLoggedIn, user?.id]);
+
+  const readPopularCache = (): Phone[] | null => {
+    try {
+      const raw = localStorage.getItem(popularCacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { ts: number; phones: unknown };
+      if (!parsed || typeof parsed.ts !== "number" || !Array.isArray(parsed.phones)) return null;
+      if (Date.now() - parsed.ts > POPULAR_CACHE_TTL_MS) return null;
+      const phones = parsed.phones as any[];
+      const safe = phones
+        .filter(Boolean)
+        .map((p) => ({
+          id: String(p.id ?? ""),
+          name: String(p.name ?? ""),
+          brand: String(p.brand ?? ""),
+          image: String(p.image ?? ""),
+          maxPrice: Number(p.maxPrice ?? 0),
+          variant: typeof p.variant === "string" ? p.variant : undefined,
+        }))
+        .filter((p) => p.id && p.name && p.brand);
+      return safe.slice(0, POPULAR_LIMIT);
+    } catch {
+      return null;
+    }
+  };
+
+  const writePopularCache = (phones: Phone[]) => {
+    try {
+      localStorage.setItem(
+        popularCacheKey,
+        JSON.stringify({ ts: Date.now(), phones: phones.slice(0, POPULAR_LIMIT) })
+      );
+    } catch {
+      // ignore quota / privacy mode
+    }
+  };
+
+  const SEARCH_API_URL =
+    (import.meta.env.VITE_SEARCH_API_URL as string | undefined) ??
+    "https://reprice-ml-backend.onrender.com/search";
+
+  const parseBackendSearchResponse = async (res: Response): Promise<BackendPhone[]> => {
+    // Supports either:
+    // 1) FastAPI shape: { query, count, phones: [...] }
+    // 2) Legacy shape: [ ... ]
+    const payload = await res.json().catch(() => null);
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload as BackendPhone[];
+    if (typeof payload === "object" && Array.isArray((payload as any).phones)) {
+      return (payload as any).phones as BackendPhone[];
+    }
+    return [];
+  };
+
+  const fetchPhonesByQuery = async (q: string): Promise<BackendPhone[]> => {
+    const query = q ?? "";
+
+    // Never hit the backend with an empty query.
+    if (!query.trim()) return [];
+
+    // Primary (your FastAPI backend): POST with JSON body { q: "..." }
+    try {
+      const resPost = await fetch(SEARCH_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ q: query }),
+      });
+
+      if (resPost.ok) return parseBackendSearchResponse(resPost);
+
+      // Some backends may expect { query: "..." }
+      if (resPost.status === 422) {
+        const resPostAlt = await fetch(SEARCH_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ query }),
+        });
+        if (resPostAlt.ok) return parseBackendSearchResponse(resPostAlt);
+      }
+
+      // If backend doesn't allow POST, fall back to GET styles.
+      if (resPost.status !== 405) return [];
+    } catch {
+      // fall through to GET fallback
+    }
+
+    // Fallback: GET with ?q=...
+    const urlQ = `${SEARCH_API_URL}?q=${encodeURIComponent(query)}`;
+    const resQ = await fetch(urlQ);
+    if (resQ.ok) return parseBackendSearchResponse(resQ);
+
+    // Fallback: some backends use ?query=...
+    const urlQuery = `${SEARCH_API_URL}?query=${encodeURIComponent(query)}`;
+    const resQuery = await fetch(urlQuery);
+    if (resQuery.ok) return parseBackendSearchResponse(resQuery);
+
+    return [];
+  };
+
+  const mapBackendPhones = (data: BackendPhone[]) => {
+    // Auto-fill missing variants using the first available variant per (brand, model).
+    const firstVariantByModel = new Map<string, string>();
+    for (const item of data) {
+      const brand = (item.brand || "").trim();
+      const model = (item.model || "").trim();
+      if (!brand || !model) continue;
+      const v = formatVariant(item.variant);
+      if (!v) continue;
+      const key = `${brand.toLowerCase()}|${model.toLowerCase()}`;
+      if (!firstVariantByModel.has(key)) firstVariantByModel.set(key, v);
+    }
+
+    const mapped = data
+      .map((item, idx) => {
+        const brand = (item.brand || "").trim();
+        const model = (item.model || "").trim();
+        if (!brand || !model) return null;
+
+        const key = `${brand.toLowerCase()}|${model.toLowerCase()}`;
+        const variant =
+          formatVariant(item.variant) ?? firstVariantByModel.get(key) ?? undefined;
+
+        const id = `${toSlug(brand)}-${toSlug(model)}-${toSlug(variant ?? "na")}-${idx}`;
+        return {
+          id,
+          name: `${brand} ${model}`,
+          brand,
+          variant,
+          maxPrice: item.price,
+          image: item.image || item.link || "",
+        } satisfies Phone;
+      })
+      .filter(Boolean) as Phone[];
+
+    return uniqByKey(
+      mapped,
+      (p) => `${p.brand.toLowerCase()}|${p.name.toLowerCase()}|${p.variant ?? ""}`
+    );
+  };
+
+  const sortPhones = (phones: Phone[]) => {
+    if (sortOrder === "none") return phones;
+    const copy = [...phones];
+    copy.sort((a, b) => (a.maxPrice ?? 0) - (b.maxPrice ?? 0));
+    if (sortOrder === "price-desc") copy.reverse();
+    return copy;
+  };
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
-
-    void warmupPhoneSearch(controller.signal);
-
-    const cached = readDefaultCache();
-    if (cached) {
-      setDefaultPhones(cached.phones);
-      setBrands(mergeBrands(cached.brands, buildStaticBrands()));
-      setDefaultError("");
-      setIsDefaultLoading(false);
-    }
-
-    const mapBackendPhones = (data: BackendPhone[]) => {
-      const mapped = data
-        .map((item, idx) => {
-          const variant = formatVariant(item.variant);
-          if (!variant) return null;
-
-          const brand = (item.brand || "").trim();
-          const model = (item.model || "").trim();
-          if (!brand || !model) return null;
-
-          const id = `${toSlug(brand)}-${toSlug(model)}-${toSlug(variant)}-${idx}`;
-          return {
-            id,
-            name: `${brand} ${model}`,
-            brand,
-            variant,
-            maxPrice: item.price,
-            image: item.image || "",
-          } satisfies Phone;
-        })
-        .filter(Boolean) as Phone[];
-
-      return uniqByKey(
-        mapped,
-        (p) => `${p.brand.toLowerCase()}|${p.name.toLowerCase()}|${p.variant ?? ""}`
-      );
-    };
 
     const fetchByQuery = async (q: string) => {
-      const data = await fetchSearchPhonesRaw(q, { signal: controller.signal });
-      return mapBackendPhones(data as any);
+      const data = await fetchPhonesByQuery(q);
+      return mapBackendPhones(data);
     };
 
     const loadDefault = async () => {
       setIsDefaultLoading(true);
       setDefaultError("");
+
+      // Fast path: load cached popular phones (per user) and skip network.
+      const cached = readPopularCache();
+      if (cached && cached.length > 0) {
+        if (!cancelled) {
+          setDefaultPhones(cached);
+          if (!searchQuery.trim()) setFilteredPhones(cached);
+          setIsDefaultLoading(false);
+        }
+        return;
+      }
 
       try {
         const candidates: Phone[] = [];
@@ -374,21 +418,43 @@ export default function SellPhone() {
           }
         };
 
-        // Keep default load lean to avoid many pending requests on cold start.
-        const seeds = ["iphone", "samsung", "vivo", "oneplus", "oppo", "xiaomi", "realme", "redmi"];
-        const CONCURRENCY = 3;
+        // Fast popular list: fetch until we have enough unique brands.
+        const popularByBrand = new Map<string, Phone>();
+        const seeds = [
+          "iphone",
+          "samsung",
+          "oneplus",
+          "oppo",
+          "vivo",
+          "xiaomi",
+          "realme",
+          "pixel",
+          "motorola",
+          "nokia",
+          "redmi",
+          "iqoo",
+          "nothing",
+        ];
 
-        for (let i = 0; i < seeds.length; i += CONCURRENCY) {
-          const batch = seeds.slice(i, i + CONCURRENCY);
-          const results = await Promise.allSettled(batch.map((seed) => fetchByQuery(seed)));
-          for (const r of results) {
-            if (r.status === "fulfilled") add(r.value);
+        for (const seed of seeds) {
+          if (popularByBrand.size >= POPULAR_LIMIT) break;
+          try {
+            const phones = await fetchByQuery(seed);
+            add(phones);
+            for (const p of phones) {
+              const brandKey = (p.brand || "").trim().toLowerCase();
+              if (!brandKey) continue;
+              if (!popularByBrand.has(brandKey)) {
+                popularByBrand.set(brandKey, p);
+                if (popularByBrand.size >= POPULAR_LIMIT) break;
+              }
+            }
+          } catch {
+            // ignore a single seed failure
           }
-
-          const diverseNow = pickDiverseByBrand(candidates, 10);
-          if (diverseNow.length >= 10 && candidates.length >= 60) break;
         }
 
+        // Derive brand list from backend data for "Browse by Brand"
         const byBrandModels = new Map<string, string[]>();
         for (const p of candidates) {
           const brandId = toSlug(p.brand);
@@ -409,36 +475,45 @@ export default function SellPhone() {
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
 
-        const diverse = pickDiverseByBrand(candidates, 10);
-        if (diverse.length === 0) {
-          throw new Error("No phones with variant found");
-        }
+        // One phone per brand only.
+        const diverse = Array.from(popularByBrand.values()).slice(0, POPULAR_LIMIT);
+        // Never throw: just show a friendly empty state.
 
         if (!cancelled) {
           setDefaultPhones(diverse);
+          if (!searchQuery.trim()) setFilteredPhones(diverse);
           setBrands(mergeBrands(derivedBrands, buildStaticBrands()));
-          writeDefaultCache({ ts: Date.now(), phones: diverse, brands: derivedBrands });
+
+          if (diverse.length > 0) {
+            writePopularCache(diverse);
+          }
+
+          if (diverse.length === 0) {
+            setDefaultError(
+              "No phones available right now. Try searching for your phone model (e.g., iPhone, Galaxy, OnePlus)."
+            );
+          }
         }
       } catch (e) {
         console.error("Failed to load default phones", e);
         if (!cancelled) {
+          setDefaultPhones([]);
+          setFilteredPhones([]);
           setDefaultError("Default phones could not be loaded.");
           setBrands(buildStaticBrands());
+
         }
       } finally {
         if (!cancelled) setIsDefaultLoading(false);
       }
     };
 
-    // Always refresh in background (cache makes it instant on repeat visits)
-    void loadDefault();
-
+    loadDefault();
     return () => {
       cancelled = true;
-      controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [popularCacheKey]);
 
   // Allow /brands route to redirect here and open Brands tab.
   useEffect(() => {
@@ -473,6 +548,8 @@ export default function SellPhone() {
   const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    setSearchError("");
+
     if (!searchQuery.trim()) {
       setFilteredPhones(defaultPhones);
       return;
@@ -480,38 +557,20 @@ export default function SellPhone() {
 
     setIsSearching(true);
 
-    searchAbortRef.current?.abort();
-    const controller = new AbortController();
-    searchAbortRef.current = controller;
-
     try {
-      const data = await fetchSearchPhonesRaw(searchQuery, { signal: controller.signal });
-
-      const mapped = (data as BackendPhone[])
-        .map((item, idx) => {
-          const variant = formatVariant(item.variant);
-          if (!variant) return null;
-
-          const brand = (item.brand || "").trim();
-          const model = (item.model || "").trim();
-          if (!brand || !model) return null;
-
-          return {
-            id: `${toSlug(brand)}-${toSlug(model)}-${toSlug(variant)}-${idx}`,
-            name: `${brand} ${model}`,
-            brand,
-            variant,
-            maxPrice: item.price,
-            image: item.image || "",
-          } satisfies Phone;
-        })
-        .filter(Boolean) as Phone[];
-
+      const data = await fetchPhonesByQuery(searchQuery);
+      const mapped = mapBackendPhones(data);
       setFilteredPhones(mapped);
-    } catch (err) {
-      if ((err as any)?.name !== "AbortError") {
-        console.error("Search failed", err);
+
+      if (mapped.length === 0) {
+        setSearchError(
+          `No phones matched “${searchQuery.trim()}”. Try a different keyword (e.g., brand + model).`
+        );
       }
+    } catch (err) {
+      console.error("Search failed", err);
+      setFilteredPhones([]);
+      setSearchError("Search failed. Please try again.");
     } finally {
       setIsSearching(false);
     }
@@ -523,32 +582,9 @@ export default function SellPhone() {
       setBrandPhonesError("");
       setIsBrandPhonesLoading(true);
 
-      brandAbortRef.current?.abort();
-      const controller = new AbortController();
-      brandAbortRef.current = controller;
-
       try {
-        const data = await fetchSearchPhonesRaw(brand.name, { signal: controller.signal });
-
-        const mapped = (data as BackendPhone[])
-          .map((item, idx) => {
-            const variant = formatVariant(item.variant);
-            if (!variant) return null;
-
-            const b = (item.brand || "").trim();
-            const model = (item.model || "").trim();
-            if (!b || !model) return null;
-
-            return {
-              id: `${toSlug(b)}-${toSlug(model)}-${toSlug(variant)}-${idx}`,
-              name: `${b} ${model}`,
-              brand: b,
-              variant,
-              maxPrice: item.price,
-              image: item.image || "",
-            } satisfies Phone;
-          })
-          .filter(Boolean) as Phone[];
+        const data = await fetchPhonesByQuery(brand.name);
+        const mapped = mapBackendPhones(data);
 
         const exact = mapped.filter(
           (p) => p.brand.trim().toLowerCase() === brand.name.trim().toLowerCase()
@@ -556,15 +592,25 @@ export default function SellPhone() {
 
         setBrandPhones((exact.length > 0 ? exact : mapped).slice(0, 120));
       } catch (e) {
-        if ((e as any)?.name !== "AbortError") {
-          console.error("Failed to load brand phones", e);
-        }
+        console.error("Failed to load brand phones", e);
         setBrandPhones([]);
         setBrandPhonesError("Brand phones could not be loaded.");
       } finally {
         setIsBrandPhonesLoading(false);
       }
     };
+
+  const sortedFilteredPhones = useMemo(
+    () => sortPhones(filteredPhones),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredPhones, sortOrder]
+  );
+
+  const sortedBrandPhones = useMemo(
+    () => sortPhones(brandPhones),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [brandPhones, sortOrder]
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -631,12 +677,25 @@ export default function SellPhone() {
                   type="submit"
                   className="absolute right-1 top-1 h-8"
                   size="sm"
-                  disabled={isSearching}
                 >
-                  {isSearching ? "Searching..." : "Search"}
+                  Search
                 </Button>
               </div>
             </form>
+
+            <div className="max-w-2xl mx-auto mb-4 flex items-center justify-end gap-3">
+              <div className="text-sm text-gray-600">Sort by</div>
+              <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+                <SelectTrigger className="w-[220px] bg-white">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Recommended</SelectItem>
+                  <SelectItem value="price-asc">Price: low → high</SelectItem>
+                  <SelectItem value="price-desc">Price: high → low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="mx-auto">
@@ -645,31 +704,24 @@ export default function SellPhone() {
               </TabsList>
 
               <TabsContent value="popular" className="mt-6">
-                {defaultError ? (
-                  <div className="text-center text-red-600 py-10">
-                    {defaultError}
-                  </div>
-                ) : filteredPhones.length === 0 && (isDefaultLoading || isSearching) ? (
+                {isDefaultLoading || isSearching ? (
                   <div className="text-center text-gray-600 py-10">
                     Loading phones...
                   </div>
-                ) : filteredPhones.length === 0 ? (
+                ) : defaultError ? (
+                  <div className="text-center text-red-600 py-10">
+                    {defaultError}
+                  </div>
+                ) : sortedFilteredPhones.length === 0 ? (
                   <div className="text-center text-gray-600 py-10">
-                    No phones found.
+                    {searchError || "No phones found."}
                   </div>
                 ) : (
-                  <div>
-                    {(isDefaultLoading || isSearching) && (
-                      <div className="text-center text-gray-500 text-sm mb-4">
-                        {isSearching ? "Searching results..." : "Updating popular phones..."}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-                      {filteredPhones.map((phone) => (
-                        <div key={phone.id} className="group">
-                          <Card className="overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 border-0 rounded-3xl bg-gradient-to-br from-pink-50 via-blue-50 to-yellow-50 h-[320px]">
-                            <CardContent className="p-4 flex flex-col relative h-full">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                    {sortedFilteredPhones.map((phone) => (
+                      <div key={phone.id} className="group">
+                        <Card className="overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 border-0 rounded-3xl bg-gradient-to-br from-pink-50 via-blue-50 to-yellow-50 h-[320px]">
+                          <CardContent className="p-4 flex flex-col relative h-full">
                             {/* Heart Icon */}
                             <button className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-all hover:scale-110">
                               <Heart className="w-4 h-4 text-gray-400 hover:text-red-500 transition-colors" />
@@ -716,15 +768,9 @@ export default function SellPhone() {
                                 )}
                                 <div className="pt-2">
                                   <div className="flex items-center justify-between gap-2">
-                                    {phone.maxPrice > 0 ? (
-                                      <p className="text-lg font-bold text-gray-900">
-                                        ₹{phone.maxPrice.toLocaleString()}
-                                      </p>
-                                    ) : (
-                                      <p className="text-sm font-semibold text-gray-700">
-                                        Get quote
-                                      </p>
-                                    )}
+                                    <p className="text-lg font-bold text-gray-900">
+                                      ₹{phone.maxPrice.toLocaleString()}
+                                    </p>
                                     <Button
                                       size="sm"
                                       className="bg-gray-900 hover:bg-gray-800 text-white rounded-full px-4 py-1 text-xs font-medium"
@@ -735,11 +781,10 @@ export default function SellPhone() {
                                 </div>
                               </div>
                             </Link>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      ))}
-                    </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ))}
                   </div>
                 )}
               </TabsContent>
@@ -773,13 +818,13 @@ export default function SellPhone() {
                       <div className="text-center text-red-600 py-10">
                         {brandPhonesError}
                       </div>
-                    ) : brandPhones.length === 0 ? (
+                    ) : sortedBrandPhones.length === 0 ? (
                       <div className="text-center text-gray-600 py-10">
                         No phones found for {selectedBrand.name}.
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-                        {brandPhones.map((phone) => (
+                        {sortedBrandPhones.map((phone) => (
                           <div key={phone.id} className="group">
                             <Card className="overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 border-0 rounded-3xl bg-gradient-to-br from-pink-50 via-blue-50 to-yellow-50 h-[320px]">
                               <CardContent className="p-4 flex flex-col relative h-full">
@@ -816,15 +861,9 @@ export default function SellPhone() {
                                     )}
                                     <div className="pt-2">
                                       <div className="flex items-center justify-between gap-2">
-                                        {phone.maxPrice > 0 ? (
-                                          <p className="text-lg font-bold text-gray-900">
-                                            ₹{phone.maxPrice.toLocaleString()}
-                                          </p>
-                                        ) : (
-                                          <p className="text-sm font-semibold text-gray-700">
-                                            Get quote
-                                          </p>
-                                        )}
+                                        <p className="text-lg font-bold text-gray-900">
+                                          ₹{phone.maxPrice.toLocaleString()}
+                                        </p>
                                         <Button
                                           size="sm"
                                           className="bg-gray-900 hover:bg-gray-800 text-white rounded-full px-4 py-1 text-xs font-medium"
