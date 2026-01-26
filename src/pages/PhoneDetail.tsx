@@ -43,22 +43,9 @@ const formatPrice = (value: number | null | undefined): string => {
 };
 
 const API_BASE_URL = (import.meta.env.VITE_AI_API_URL as string | undefined) ??
-  "https://reprice-ml-backend.onrender.com";
+  "https://reprice-ml3.onrender.com";
 
-const AI_FALLBACK_URL = "https://reprice-ml-backend.onrender.com";
-
-function cleanBaseUrl(url: string) {
-  return url.replace(/\/+$/, "");
-}
-
-function isHttpUrl(value: string) {
-  try {
-    const u = new URL(value);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+const AI_FALLBACK_URL = "https://reprice-ml3.onrender.com";
 
 type BackendStatus = "unknown" | "ready" | "initializing" | "down";
 
@@ -184,28 +171,14 @@ export default function PhoneDetail() {
   const lastQuoteKeyRef = useRef<string | null>(null);
 
   const [aiBaseUrl, setAiBaseUrl] = useState(() => {
-    const envUrlRaw = (import.meta.env.VITE_AI_API_URL as string | undefined)?.trim();
-    const envUrl = envUrlRaw && isHttpUrl(envUrlRaw) ? cleanBaseUrl(envUrlRaw) : undefined;
-
-    // If an env URL is provided, always prefer it over any cached value.
-    // This prevents stale localStorage (e.g. old Render service URLs) from overriding deployments.
-    if (envUrl) {
-      try {
-        const cached = localStorage.getItem("reprice.aiBaseUrl.v1");
-        if (cached && cached !== envUrl) {
-          localStorage.removeItem("reprice.aiBaseUrl.v1");
-        }
-      } catch {
-        // ignore
-      }
-
-      return envUrl;
-    }
-
     try {
       const cached = localStorage.getItem("reprice.aiBaseUrl.v1");
-      if (cached && typeof cached === "string" && isHttpUrl(cached)) {
-        return cleanBaseUrl(cached);
+      if (
+        cached &&
+        typeof cached === "string" &&
+        !cached.includes("reprice-ml-backend.onrender.com")
+      ) {
+        return cached;
       }
     } catch {
       // ignore
@@ -216,7 +189,7 @@ export default function PhoneDetail() {
       return AI_FALLBACK_URL;
     }
 
-    return cleanBaseUrl(API_BASE_URL);
+    return API_BASE_URL;
   });
 
   const pricingSupportKey = `reprice.aiPricingSupported.v1.${aiBaseUrl}`;
