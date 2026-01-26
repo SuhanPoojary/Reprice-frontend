@@ -26,7 +26,7 @@ const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24; // 24h
 const PHONE_SEARCH_CACHE_VERSION = 2;
 
 const API_BASE_URL = (import.meta.env.VITE_AI_API_URL as string | undefined) ??
-  "https://reprice-ml3.onrender.com";
+  "https://reprice-ml-backend.onrender.com";
 
 let localCsvCache: { loaded: boolean; rows: CsvPhoneRow[]; ts: number } = {
   loaded: false,

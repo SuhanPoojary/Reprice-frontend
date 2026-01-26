@@ -40,6 +40,14 @@ All shadcn/ui components have been downloaded under `@/components/ui`.
 
 The `@/` path alias points to the `src/` directory
 
+## Environment variables
+
+- `VITE_AI_API_URL` = full AI backend base URL (e.g. `https://<service>.onrender.com`)
+
+Vite environment variables are baked into the build output. If you change `VITE_AI_API_URL` in a hosting provider, redeploy/rebuild the frontend.
+
+If the UI still calls an old AI URL after redeploy, clear site data/localStorage for the key `reprice.aiBaseUrl.v1`.
+
 # Commands
 
 **Install Dependencies**
