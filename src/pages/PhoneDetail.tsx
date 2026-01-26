@@ -315,10 +315,17 @@ export default function PhoneDetail() {
           // Only restore selection if we already have one or if a specific variant was passed.
           if (matchedCurrent) {
             setSelectedVariantKey((prev) => prev || matchedCurrent);
+          } else if (options.length === 1) {
+            // If there's only one variant, auto-select it.
+            setSelectedVariantKey((prev) => prev || options[0].key);
           }
         }
 
-        return;
+        // If only one variant was passed, still try to discover additional variants
+        // from the search API/local CSV so the user can select.
+        if (passedVariants.length > 1) {
+          return;
+        }
       }
 
       setIsVariantLoading(true);
@@ -400,6 +407,9 @@ export default function PhoneDetail() {
           // Require explicit user selection when variants exist.
           if (matchedCurrent) {
             setSelectedVariantKey((prev) => prev || matchedCurrent);
+          } else if (options.length === 1) {
+            // If there's only one variant, auto-select it.
+            setSelectedVariantKey((prev) => prev || options[0].key);
           }
         }
       } catch (e) {
@@ -424,9 +434,14 @@ export default function PhoneDetail() {
     return variantOptions.find((o) => o.key === selectedVariantKey) ?? null;
   }, [selectedVariantKey, variantOptions]);
 
-  const effectiveVariant = selectedVariantOption?.rawVariant ?? formatVariant(passedPhone?.variant) ?? undefined;
+  const effectiveVariantOption = useMemo(() => {
+    return selectedVariantOption ?? (variantOptions.length === 1 ? variantOptions[0] : null);
+  }, [selectedVariantOption, variantOptions]);
+
+  const effectiveVariant =
+    effectiveVariantOption?.rawVariant ?? formatVariant(passedPhone?.variant) ?? undefined;
   const effectiveBasePrice =
-    (selectedVariantOption?.price ?? Number(passedPhone?.maxPrice ?? 0)) || 0;
+    (effectiveVariantOption?.price ?? Number(passedPhone?.maxPrice ?? 0)) || 0;
 
   const effectiveScreenConditions = useMemo(() => {
     const base = effectiveBasePrice;
@@ -770,10 +785,8 @@ export default function PhoneDetail() {
 
   const canProceed = () => {
     if (currentStep === 1) {
-      // If multiple variants exist, require an explicit selection before continuing.
-      if (variantOptions.length > 1) {
-        return Boolean(selectedVariantKey);
-      }
+      // If variants exist, require a selection (single-variant models are auto-selected).
+      if (variantOptions.length >= 1) return Boolean(selectedVariantKey);
       return true;
     }
     if (currentStep === 2)
@@ -920,13 +933,11 @@ export default function PhoneDetail() {
                       <div>
                         <h3 className="font-bold text-lg">{phone.name}</h3>
                         <p className="text-sm text-gray-600">
-                          {phone.brand} • {(() => {
-                            const variant = effectiveVariant;
-                            return variant ? variant : '';
-                          })()}{(() => {
-                            const variant = effectiveVariant;
-                            return variant ? 'GB' : '';
-                          })()}{currentStep === 3 && selectedScreenCondition && ` • ${effectiveScreenConditions.find(s => s.id === selectedScreenCondition)?.name}`}
+                          {phone.brand}
+                          {effectiveVariant ? ` • ${effectiveVariant}` : ""}
+                          {currentStep === 3 && selectedScreenCondition
+                            ? ` • ${effectiveScreenConditions.find((s) => s.id === selectedScreenCondition)?.name}`
+                            : ""}
                         </p>
                         {apiPrice !== null ? (
                           <p className="text-sm font-semibold text-blue-600 mt-1">
@@ -977,9 +988,9 @@ export default function PhoneDetail() {
 
                       {isVariantLoading ? (
                         <div className="text-sm text-gray-600">Loading variants...</div>
-                      ) : variantOptions.length > 1 ? (
+                      ) : variantOptions.length >= 1 ? (
                         <div className="space-y-4">
-                          {!selectedVariantKey ? (
+                          {!selectedVariantKey && variantOptions.length > 1 ? (
                             <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
                               Please select a RAM/Storage variant to continue.
                             </div>
