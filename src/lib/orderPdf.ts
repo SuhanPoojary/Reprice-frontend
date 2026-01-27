@@ -211,7 +211,6 @@ export async function createOrderPdfBlob(order: OrderPdfData): Promise<Blob> {
   renderRow("Method", safeText(order.payment_method).toUpperCase());
   renderRow("Final Amount", formatCurrencyINR(order.price), true);
   
-  // ===== FOOTER =====
   const pageHeightReal = doc.internal.pageSize.getHeight();
   doc.setFontSize(8);
   doc.setTextColor(150);
