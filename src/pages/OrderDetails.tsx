@@ -20,6 +20,7 @@ import {
   Share2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { downloadOrderPdf, shareOrderPdf } from "@/lib/orderPdf";
 
 const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
 
@@ -52,6 +53,7 @@ export default function OrderDetails() {
   const { token } = useAuth();
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState<"download" | "share" | null>(null);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -126,18 +128,29 @@ export default function OrderDetails() {
     }
   };
 
-  const handleShare = () => {
-    const shareText = `My order ${order?.order_number} for ${order?.phone_model} is ${order?.status}. Track it here: ${window.location.href}`;
-    
-    if (navigator.share) {
-      navigator.share({
-        title: "Order Details",
-        text: shareText,
-        url: window.location.href,
-      });
-    } else {
-      navigator.clipboard.writeText(shareText);
-      alert("Link copied to clipboard!");
+  const handleDownloadPdf = async () => {
+    if (!order || pdfBusy) return;
+    setPdfBusy("download");
+    try {
+      await downloadOrderPdf(order);
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      alert("Failed to generate PDF");
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    if (!order || pdfBusy) return;
+    setPdfBusy("share");
+    try {
+      await shareOrderPdf(order);
+    } catch (err) {
+      console.error("Failed to share PDF:", err);
+      alert("Failed to share PDF");
+    } finally {
+      setPdfBusy(null);
     }
   };
 
@@ -203,7 +216,8 @@ export default function OrderDetails() {
                     size="sm"
                     variant="outline"
                     className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                    onClick={handleShare}
+                    onClick={handleSharePdf}
+                    disabled={pdfBusy !== null}
                   >
                     <Share2 size={16} />
                   </Button>
@@ -211,6 +225,8 @@ export default function OrderDetails() {
                     size="sm"
                     variant="outline"
                     className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    onClick={handleDownloadPdf}
+                    disabled={pdfBusy !== null}
                   >
                     <Download size={16} />
                   </Button>
@@ -389,6 +405,41 @@ export default function OrderDetails() {
                 )}
               </div>
             </div>
+
+            {/* Pickup Agent */}
+            {(order.agent_name || order.agent_phone) && (
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Truck className="text-blue-600" size={20} />
+                  Pickup Agent
+                </h2>
+                <div className="space-y-3">
+                  {order.agent_name && (
+                    <div className="flex items-center gap-3">
+                      <User className="text-gray-400" size={18} />
+                      <div>
+                        <p className="text-gray-600 text-sm">Name</p>
+                        <p className="font-semibold">{order.agent_name}</p>
+                      </div>
+                    </div>
+                  )}
+                  {order.agent_phone && (
+                    <div className="flex items-center gap-3">
+                      <Phone className="text-gray-400" size={18} />
+                      <div>
+                        <p className="text-gray-600 text-sm">Phone</p>
+                        <a
+                          href={`tel:${order.agent_phone}`}
+                          className="font-semibold text-blue-700 hover:underline"
+                        >
+                          {order.agent_phone}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Payment Details */}
             <div className="bg-white rounded-2xl shadow-lg p-6">
