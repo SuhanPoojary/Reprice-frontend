@@ -42,9 +42,10 @@ const formatPrice = (value: number | null | undefined): string => {
 };
 
 const API_BASE_URL = (import.meta.env.VITE_AI_API_URL as string | undefined) ??
-  "https://reprice-ml3.onrender.com";
+  "http://localhost:8000";
 
-const AI_FALLBACK_URL = "https://reprice-ml3.onrender.com";
+const AI_FALLBACK_URL =
+  (import.meta.env.VITE_AI_FALLBACK_URL as string | undefined) ?? API_BASE_URL;
 
 type BackendStatus = "unknown" | "ready" | "initializing" | "down";
 
@@ -86,8 +87,13 @@ export default function PhoneDetail() {
   const lastQuoteKeyRef = useRef<string | null>(null);
 
   const [aiBaseUrl, setAiBaseUrl] = useState(() => {
+    // If an explicit env is provided, always prefer it (ignores old cached ML3 URLs).
+    if ((import.meta.env.VITE_AI_API_URL as string | undefined)?.trim()) {
+      return API_BASE_URL;
+    }
+
     try {
-      const cached = localStorage.getItem("reprice.aiBaseUrl.v1");
+      const cached = localStorage.getItem("reprice.aiBaseUrl.v2");
       if (
         cached &&
         typeof cached === "string" &&
@@ -107,7 +113,7 @@ export default function PhoneDetail() {
     return API_BASE_URL;
   });
 
-  const pricingSupportKey = `reprice.aiPricingSupported.v1.${aiBaseUrl}`;
+  const pricingSupportKey = `reprice.aiPricingSupported.v2.${aiBaseUrl}`;
 
   if (!passedPhone) {
     return (
@@ -204,7 +210,7 @@ export default function PhoneDetail() {
 
     // Persist chosen AI backend to reuse next sessions.
     try {
-      localStorage.setItem("reprice.aiBaseUrl.v1", String(aiBaseUrl));
+      localStorage.setItem("reprice.aiBaseUrl.v2", String(aiBaseUrl));
     } catch {
       // ignore
     }

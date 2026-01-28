@@ -333,7 +333,13 @@ export default function SellPhone() {
     return [];
   };
 
-  const mapBackendPhones = (data: BackendPhone[]) => {
+  const mapBackendPhones = (
+    data: BackendPhone[],
+    options?: {
+      dedupe?: boolean;
+    }
+  ) => {
+    const dedupe = options?.dedupe ?? true;
     // Auto-fill missing variants using the first available variant per (brand, model).
     const firstVariantByModel = new Map<string, string>();
     for (const item of data) {
@@ -368,9 +374,10 @@ export default function SellPhone() {
       })
       .filter(Boolean) as Phone[];
 
-    return uniqByKey(
-      mapped,
-      (p) => `${p.brand.toLowerCase()}|${p.name.toLowerCase()}|${p.variant ?? ""}`
+    if (!dedupe) return mapped;
+
+    return uniqByKey(mapped, (p) =>
+      `${p.brand.toLowerCase()}|${p.name.toLowerCase()}|${p.variant ?? ""}`
     );
   };
 
@@ -387,7 +394,7 @@ export default function SellPhone() {
 
     const fetchByQuery = async (q: string) => {
       const data = await fetchPhonesByQuery(q);
-      return mapBackendPhones(data);
+      return mapBackendPhones(data, { dedupe: true });
     };
 
     const loadDefault = async () => {
@@ -559,7 +566,8 @@ export default function SellPhone() {
 
     try {
       const data = await fetchPhonesByQuery(searchQuery);
-      const mapped = mapBackendPhones(data);
+      // Search-by-name should show ALL matching phones/variants from the backend.
+      const mapped = mapBackendPhones(data, { dedupe: false });
       setFilteredPhones(mapped);
 
       if (mapped.length === 0) {
@@ -584,13 +592,14 @@ export default function SellPhone() {
 
       try {
         const data = await fetchPhonesByQuery(brand.name);
-        const mapped = mapBackendPhones(data);
+        // Brand view should show ALL phones for that brand.
+        const mapped = mapBackendPhones(data, { dedupe: false });
 
         const exact = mapped.filter(
           (p) => p.brand.trim().toLowerCase() === brand.name.trim().toLowerCase()
         );
 
-        setBrandPhones((exact.length > 0 ? exact : mapped).slice(0, 120));
+        setBrandPhones(exact.length > 0 ? exact : mapped);
       } catch (e) {
         console.error("Failed to load brand phones", e);
         setBrandPhones([]);
