@@ -22,7 +22,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { downloadOrderPdf, shareOrderPdf } from "@/lib/orderPdf";
 
-const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
+import { API_URL } from "@/api/config";
 
 interface OrderDetails {
   id: string;

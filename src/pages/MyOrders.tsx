@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 
-const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
+import { API_URL } from "@/api/config";
 
 interface Order {
   id: number;
