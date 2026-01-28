@@ -7,9 +7,7 @@ import {
   ReactNode,
 } from "react";
 
-const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ||
-  "https://reprice-backend-a5mp.onrender.com/api";
+import { API_URL } from "@/api/config";
 
 interface User {
   id: string | number;

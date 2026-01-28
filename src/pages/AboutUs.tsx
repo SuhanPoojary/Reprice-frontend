@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AboutUs() {
   return (
@@ -8,48 +9,87 @@ export default function AboutUs() {
 
       <main className="flex-grow bg-gray-50">
         {/* Hero Section */}
-        <section className="bg-primary text-primary-foreground py-12">
-          <div className="container mx-auto px-4 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">
-              About MobileTrade
-            </h1>
-            <p className="text-xl opacity-90 max-w-2xl mx-auto">
-              India's leading platform for selling used smartphones
-            </p>
-          </div>
-        </section>
+        <section className="bg-primary text-primary-foreground">
+          <div className="container mx-auto px-4 py-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-4">
+                  About MobileTrade
+                </h1>
+                <p className="text-lg md:text-xl opacity-90 max-w-xl">
+                  We help you sell your phone with an instant AI quote, free pickup, and fast payments.
+                </p>
 
-        {/* Our Story */}
-        <section className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto">
-              <h2 className="text-2xl font-bold mb-6">Our Story</h2>
-              <div className="prose prose-lg">
-                <p>
-                  Founded in 2018, MobileTrade started with a simple idea: to
-                  create a transparent, hassle-free way for people to sell their
-                  used smartphones for the best possible price.
-                </p>
-                <p>
-                  What began as a small startup operating out of a single office
-                  in Mumbai has now grown into India's leading platform for
-                  selling used phones, with operations in over 1,500 cities and
-                  towns across the country.
-                </p>
-                <p>
-                  Our journey has been driven by a passion for technology and a
-                  commitment to creating a circular economy where devices find
-                  new homes instead of ending up in landfills. By extending the
-                  lifecycle of smartphones, we're not only providing value to
-                  our customers but also contributing to a more sustainable
-                  future.
-                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-sm">
+                    Transparent pricing
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-sm">
+                    Doorstep pickup
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-sm">
+                    Secure data handling
+                  </span>
+                </div>
+              </div>
+
+              <div className="relative">
+                <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-white/10 to-white/0 blur-xl" />
+                <img
+                  src="/images/landing_page.jpg"
+                  alt="MobileTrade overview"
+                  className="relative w-full rounded-2xl shadow-xl object-cover max-h-[360px]"
+                />
               </div>
             </div>
           </div>
         </section>
 
-        {/* Our Mission & Vision */}
+        {/* Our Story */}
+        <section className="py-14">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-2xl font-bold mb-6">Our Story</h2>
+              <div className="prose prose-lg">
+                <p>
+                  MobileTrade started with a simple idea: make selling used smartphones as easy as ordering food.
+                  Pick your model, answer a few condition questions, and get an instant quote.
+                </p>
+                <p>
+                  We built this platform to remove haggling, hidden deductions, and uncertainty.
+                  Our pricing is transparent, and our pickup flow is designed to be fast and friendly.
+                </p>
+                <p>
+                  Every device that gets a second life helps reduce e-waste.
+                  We refurbish and responsibly recycle so phones find new homes instead of landfills.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+              <Card className="bg-white">
+                <CardContent className="p-6">
+                  <div className="text-3xl font-bold">10 min</div>
+                  <div className="text-sm text-gray-600 mt-1">Typical pickup inspection time</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-white">
+                <CardContent className="p-6">
+                  <div className="text-3xl font-bold">Instant</div>
+                  <div className="text-sm text-gray-600 mt-1">AI-assisted quoting</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-white">
+                <CardContent className="p-6">
+                  <div className="text-3xl font-bold">Secure</div>
+                  <div className="text-sm text-gray-600 mt-1">Data reset checklist & guidance</div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
+        {/* Mission */}
         <section className="py-12 bg-white">
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto">
@@ -57,17 +97,13 @@ export default function AboutUs() {
                 <div>
                   <h2 className="text-2xl font-bold mb-4">Our Mission</h2>
                   <p className="text-gray-600">
-                    To create a seamless marketplace that offers the best value
-                    for used mobile devices while promoting sustainability
-                    through device reuse and responsible recycling.
+                    Make selling a phone simple, transparent, and fair — with clear condition checks and instant payouts.
                   </p>
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold mb-4">Our Vision</h2>
                   <p className="text-gray-600">
-                    To become the world's most trusted platform for buying and
-                    selling pre-owned technology, making device upgrades
-                    affordable and environmentally responsible.
+                    Build the most trusted circular marketplace for pre-owned devices, reducing e-waste and making upgrades affordable.
                   </p>
                 </div>
               </div>
@@ -75,8 +111,28 @@ export default function AboutUs() {
           </div>
         </section>
 
+        {/* What we buy (with images) */}
+        <section className="py-14 bg-gray-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl font-bold">We Buy Popular Models</h2>
+              <p className="text-gray-600">From flagship iPhones to Android favorites</p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
+              {["/assets/phones/iphone-13-pro.png", "/assets/phones/iphone-12.png", "/assets/phones/pixel6-pro.png", "/assets/phones/galaxy-s21.png"].map(
+                (src) => (
+                  <div key={src} className="bg-white rounded-xl border shadow-sm p-4 flex items-center justify-center">
+                    <img src={src} alt="Phone" className="h-24 w-auto object-contain" />
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* Our Values */}
-        <section className="py-16 bg-gray-50">
+        <section className="py-14 bg-white">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10">
               <h2 className="text-2xl font-bold">Our Values</h2>
@@ -162,84 +218,38 @@ export default function AboutUs() {
           </div>
         </section>
 
-        {/* Our Team */}
-        <section className="py-16 bg-white">
+        {/* Team */}
+        <section className="py-14 bg-gray-50">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10">
               <h2 className="text-2xl font-bold">Our Leadership Team</h2>
-              <p className="text-gray-600">
-                The people behind MobileTrade's success
-              </p>
+              <p className="text-gray-600">A small team obsessed with customer experience</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-              {/* Team Member 1 */}
-              <div className="text-center">
-                <div className="w-32 h-32 rounded-full overflow-hidden mx-auto mb-4">
-                  <img
-                    src="/assets/team/ceo.png"
-                    alt="CEO"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://placehold.co/200x200?text=CEO";
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold">Rohit Sharma</h3>
-                <p className="text-sm text-gray-500">CEO & Founder</p>
-              </div>
+              {[
+                { name: "Rohit Sharma", role: "Founder" },
+                { name: "Priya Patel", role: "Engineering" },
+                { name: "Vikram Mehta", role: "Operations" },
+                { name: "Aditi Singh", role: "Growth" },
+              ].map((member) => {
+                const initials = member.name
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((p) => p[0]!.toUpperCase())
+                  .join("");
 
-              {/* Team Member 2 */}
-              <div className="text-center">
-                <div className="w-32 h-32 rounded-full overflow-hidden mx-auto mb-4">
-                  <img
-                    src="/assets/team/cto.png"
-                    alt="CTO"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://placehold.co/200x200?text=CTO";
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold">Priya Patel</h3>
-                <p className="text-sm text-gray-500">CTO</p>
-              </div>
-
-              {/* Team Member 3 */}
-              <div className="text-center">
-                <div className="w-32 h-32 rounded-full overflow-hidden mx-auto mb-4">
-                  <img
-                    src="/assets/team/coo.png"
-                    alt="COO"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://placehold.co/200x200?text=COO";
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold">Vikram Mehta</h3>
-                <p className="text-sm text-gray-500">COO</p>
-              </div>
-
-              {/* Team Member 4 */}
-              <div className="text-center">
-                <div className="w-32 h-32 rounded-full overflow-hidden mx-auto mb-4">
-                  <img
-                    src="/assets/team/cmo.png"
-                    alt="CMO"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://placehold.co/200x200?text=CMO";
-                    }}
-                  />
-                </div>
-                <h3 className="font-semibold">Aditi Singh</h3>
-                <p className="text-sm text-gray-500">CMO</p>
-              </div>
+                return (
+                  <div key={member.name} className="text-center">
+                    <div className="w-28 h-28 rounded-full mx-auto mb-4 grid place-items-center bg-gradient-to-br from-primary/20 to-primary/5 border">
+                      <span className="text-2xl font-bold text-primary">{initials}</span>
+                    </div>
+                    <h3 className="font-semibold">{member.name}</h3>
+                    <p className="text-sm text-gray-500">{member.role}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>

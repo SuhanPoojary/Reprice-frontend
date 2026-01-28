@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/sonner";
 import {
   Select,
   SelectContent,
@@ -34,44 +35,9 @@ import {
 
 import { useAuth } from "@/context/AuthContext"; 
 
+import { API_URL } from "@/api/config";
 
-const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
-
-const getCurrentLocation = (): Promise<{
-  latitude: number;
-  longitude: number;
-}> => {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) {
-      // fallback
-      resolve({ latitude: 19.076, longitude: 72.8777 });
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      // fallback if GPS takes too long
-      resolve({ latitude: 19.076, longitude: 72.8777 });
-    }, 8000); // 8 seconds max
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        clearTimeout(timeoutId);
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      () => {
-        clearTimeout(timeoutId);
-        resolve({ latitude: 19.076, longitude: 72.8777 }); // fallback
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 7000,
-      }
-    );
-  });
-};
+// Location is optional; serviceability is determined by PIN code.
 
 
 
@@ -83,6 +49,7 @@ export default function Checkout() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeSlot, setTimeSlot] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
 
   const [form, setForm] = useState({
@@ -214,11 +181,9 @@ export default function Checkout() {
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
-      // ✅ GET REAL LOCATION
-      const { latitude, longitude } = await getCurrentLocation();
-
       const res = await fetch(`${API_URL}/orders/create`, {
         method: "POST",
         headers: {
@@ -230,8 +195,6 @@ export default function Checkout() {
           city: form.city,
           state: form.state,
           pincode: form.pincode,
-          latitude,
-          longitude,
           phone: phoneData,
           pickupDate: form.pickupDate,
           timeSlot,  
@@ -241,23 +204,50 @@ export default function Checkout() {
 
       const data = await res.json();
 
-      if (!data.success) {
-        throw new Error("Order failed");
+      if (!res.ok || !data.success) {
+        let message = String(data?.message || "Order failed. Please try again.");
+
+        if (res.status === 422 && (data?.code === "NOT_SERVICEABLE" || /not\s+servic/i.test(message))) {
+          message =
+            "Sorry — we don’t service this PIN code yet. Try a nearby PIN code or change your pickup address.";
+        }
+
+        if (res.status === 400 && data?.code === "INVALID_PINCODE") {
+          message = "Please enter a valid 6-digit PIN code.";
+        }
+
+        throw new Error(message);
       }
       if (data.order && data.order.id) {
         localStorage.setItem('lastOrderId', data.order.id);
       }
-      setStep(3);
-      window.scrollTo(0, 0);
-    } catch (err) {
-    console.error("Checkout error:", err);
-    alert(
-      "Location access is required to place the order.\nPlease allow location and try again."
-    );
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      toast.success("Order placed successfully", {
+        description: "Redirecting you to Sell Phone…",
+      });
+      navigate("/sell", { replace: true });
+    } catch (err: any) {
+      console.error("Checkout error:", err);
+
+      const msg = String(err?.message || "Order failed");
+      setSubmitError(msg);
+      toast.error("Couldn’t place the order", { description: msg });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // After placing an order, redirect back to Sell Phone page.
+  useEffect(() => {
+    if (step !== 3) return;
+
+    const t = window.setTimeout(() => {
+      navigate("/sell", { replace: true });
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [step, navigate]);
 
 console.log("CHECKOUT STATE:", location.state);
 
@@ -571,6 +561,13 @@ console.log("CHECKOUT STATE:", location.state);
                       onSubmit={handleSubmitPayment}
                       className="p-6 space-y-6"
                     >
+                      {submitError && (
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
+                          <div className="font-semibold">Order not placed</div>
+                          <div className="text-sm mt-1">{submitError}</div>
+                        </div>
+                      )}
+
                       <RadioGroup
                         value={paymentMethod}
                         onValueChange={setPaymentMethod}
@@ -895,10 +892,10 @@ console.log("CHECKOUT STATE:", location.state);
 
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button
-                          onClick={() => navigate("/")}
+                          onClick={() => navigate("/sell")}
                           className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                         >
-                          Back to Home
+                          Sell Another Phone
                         </Button>
                         <Button
   variant="outline"
@@ -907,13 +904,20 @@ console.log("CHECKOUT STATE:", location.state);
     const orderId = localStorage.getItem('lastOrderId');
     if (orderId) {
       navigate(`/order/${orderId}`);
-    } else {
-      alert('Order ID not found');
+      return;
     }
+
+    const msg = 'Order ID not found. Please open it from My Orders.';
+    setSubmitError(msg);
+    toast.error(msg);
   }}
 >
   View Order Details
 </Button>
+                      </div>
+
+                      <div className="mt-3 text-center text-xs text-gray-500">
+                        Redirecting you to Sell Phone page in a few seconds...
                       </div>
                     </div>
                   </div>

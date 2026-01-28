@@ -375,8 +375,7 @@ export default function Login({ variant = "page" }: LoginProps) {
                   </GoogleOAuthProvider>
                 ) : (
                   <div className="text-xs text-gray-500 text-center">
-                    Google login is not configured. Set{" "}
-                    <span className="font-medium">VITE_GOOGLE_CLIENT_ID</span> and restart the dev server.
+                    
                   </div>
                 )}
               </div>

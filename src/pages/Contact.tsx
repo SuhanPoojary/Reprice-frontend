@@ -37,12 +37,37 @@ export default function Contact() {
 
       <main className="flex-grow bg-gray-50">
         {/* Hero Section */}
-        <section className="bg-primary text-primary-foreground py-12">
-          <div className="container mx-auto px-4 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">Contact Us</h1>
-            <p className="text-xl opacity-90 max-w-2xl mx-auto">
-              We're here to help with any questions about selling your phone
-            </p>
+        <section className="bg-primary text-primary-foreground">
+          <div className="container mx-auto px-4 py-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-4">Contact Us</h1>
+                <p className="text-lg md:text-xl opacity-90 max-w-xl">
+                  Need help with an AI quote, pickup, or payment? We’ll get you sorted.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <a href="tel:18001234567">
+                    <Button className="bg-white text-primary hover:bg-white/90">
+                      <Phone className="mr-2 h-4 w-4" /> Call support
+                    </Button>
+                  </a>
+                  <a href="mailto:support@mobiletrade.com">
+                    <Button variant="outline" className="border-white/40 text-white hover:bg-white/10">
+                      <Mail className="mr-2 h-4 w-4" /> Email us
+                    </Button>
+                  </a>
+                </div>
+              </div>
+
+              <div className="relative">
+                <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-white/10 to-white/0 blur-xl" />
+                <img
+                  src="/images/landing2.jpg"
+                  alt="Support"
+                  className="relative w-full rounded-2xl shadow-xl object-cover max-h-[360px]"
+                />
+              </div>
+            </div>
           </div>
         </section>
 
@@ -224,10 +249,12 @@ export default function Contact() {
                     Our customer support team is available to help you with any
                     urgent inquiries.
                   </p>
-                  <Button variant="outline" className="w-full">
-                    <Phone className="mr-2 h-4 w-4" />
-                    Call Us Now
-                  </Button>
+                  <a href="tel:18001234567" className="block">
+                    <Button variant="outline" className="w-full">
+                      <Phone className="mr-2 h-4 w-4" />
+                      Call Us Now
+                    </Button>
+                  </a>
                 </div>
               </div>
             </div>
@@ -237,10 +264,47 @@ export default function Contact() {
         {/* Map Section */}
         <section className="py-8 bg-white">
           <div className="container mx-auto px-4">
-            <div className="bg-gray-200 h-96 rounded-lg overflow-hidden">
-              {/* In a real app, you would embed a Google Map here */}
-              <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                <p className="text-gray-500">Map would be displayed here</p>
+            <div className="rounded-lg overflow-hidden border bg-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-2">
+                <img
+                  src="/images/slider2.jpg"
+                  alt="Office location"
+                  className="h-80 w-full object-cover"
+                />
+                <div className="p-6 md:p-8">
+                  <h3 className="text-xl font-semibold mb-2">Our Office</h3>
+                  <p className="text-gray-600 mb-4">
+                    Visit us for business inquiries or partnerships.
+                  </p>
+                  <div className="space-y-3 text-gray-700">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-5 w-5 text-primary mt-0.5" />
+                      <div>
+                        123 Business Park, Tech Avenue<br />
+                        Mumbai, Maharashtra 400001, India
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-5 w-5 text-primary mt-0.5" />
+                      <div>
+                        Mon–Fri: 9:00 AM – 8:00 PM<br />
+                        Sat: 10:00 AM – 6:00 PM
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <a href="tel:18001234567">
+                      <Button>
+                        <Phone className="mr-2 h-4 w-4" /> Call
+                      </Button>
+                    </a>
+                    <a href="mailto:support@mobiletrade.com">
+                      <Button variant="outline">
+                        <Mail className="mr-2 h-4 w-4" /> Email
+                      </Button>
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

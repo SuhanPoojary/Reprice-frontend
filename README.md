@@ -36,6 +36,11 @@ All shadcn/ui components have been downloaded under `@/components/ui`.
 - Import components from `@/components/ui` in your React components
 - Customize the UI by modifying the Tailwind configuration
 
+## API configuration
+
+- Configure the backend base URL with `VITE_API_URL` (see `.env.example`).
+- Example for local backend: `VITE_API_URL=http://localhost:5000/api`
+
 ## Note
 
 The `@/` path alias points to the `src/` directory

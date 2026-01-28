@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 
-const API_URL = "https://reprice-backend-a5mp.onrender.com/api";
+import { API_URL } from "@/api/config";
 
 interface Order {
   id: number;
@@ -14,6 +14,8 @@ interface Order {
   price: number;
   status: string;
   created_at: string;
+  agent_name?: string;
+  agent_phone?: string;
 }
 
 export default function MyOrders() {
@@ -93,6 +95,22 @@ export default function MyOrders() {
                       <p className="text-sm text-gray-500">
                         {new Date(order.created_at).toLocaleDateString("en-IN")}
                       </p>
+
+                      {order.agent_phone && (
+                        <div className="mt-2 text-sm text-gray-600">
+                          <span className="text-gray-500">Pickup Agent:</span>{" "}
+                          {order.agent_name ? (
+                            <span className="font-medium">{order.agent_name} · </span>
+                          ) : null}
+                          <a
+                            href={`tel:${order.agent_phone}`}
+                            className="font-semibold text-blue-700 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {order.agent_phone}
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-right">
