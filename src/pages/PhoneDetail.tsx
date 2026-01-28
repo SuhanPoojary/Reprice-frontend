@@ -43,7 +43,7 @@ const formatPrice = (value: number | null | undefined): string => {
 };
 
 const API_BASE_URL = (import.meta.env.VITE_AI_API_URL as string | undefined) ??
-  "http://localhost:8000";
+  "https://reprice-ml-backend.onrender.com";
 
 const AI_FALLBACK_URL =
   (import.meta.env.VITE_AI_FALLBACK_URL as string | undefined) ?? API_BASE_URL;
