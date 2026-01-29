@@ -98,6 +98,36 @@ function uniqByKey<T>(items: T[], getKey: (item: T) => string) {
   return result;
 }
 
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function filterPhonesForQuery(phones: Phone[], query: string) {
+  const q = normalizeText(query);
+  if (!q) return phones;
+
+  const tokens = q.split(" ").filter(Boolean);
+  const scored: Array<{ score: number; phone: Phone }> = [];
+
+  for (const phone of phones) {
+    const full = normalizeText(`${phone.brand} ${phone.name} ${phone.variant ?? ""}`);
+    if (!full) continue;
+
+    const tokenMatches = tokens.reduce((acc, t) => acc + (full.includes(t) ? 1 : 0), 0);
+    if (tokenMatches === 0) continue;
+
+    const score = (full.includes(q) ? 100 : 0) + tokenMatches;
+    scored.push({ score, phone });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.phone);
+}
+
 function pickDiverseByBrand(items: Phone[], limit: number) {
   const byBrand = new Map<string, Phone[]>();
   for (const item of items) {
@@ -364,6 +394,15 @@ export default function SellPhone() {
     const dedupe = options?.dedupe ?? true;
     // Auto-fill missing variants using the first available variant per (brand, model).
     const firstVariantByModel = new Map<string, string>();
+
+    const grouped = new Map<
+      string,
+      {
+        phone: Phone;
+        variants: Map<string, { variant: string; price: number }>;
+      }
+    >();
+
     for (const item of data) {
       const brand = (item.brand || "").trim();
       const model = (item.model || "").trim();
@@ -374,6 +413,10 @@ export default function SellPhone() {
       const image = (item.image || item.link || "").toString();
 
       const variant = formatVariant(item.variant);
+
+      if (variant && !firstVariantByModel.has(key)) {
+        firstVariantByModel.set(key, variant);
+      }
 
       const entry = grouped.get(key);
       if (!entry) {
@@ -414,6 +457,17 @@ export default function SellPhone() {
       }
     }
 
+    if (dedupe) {
+      const collapsed = Array.from(grouped.values()).map(({ phone, variants }) => {
+        const variantsArr = Array.from(variants.values());
+        return {
+          ...phone,
+          variants: variantsArr.length > 0 ? variantsArr : undefined,
+        } satisfies Phone;
+      });
+      return collapsed;
+    }
+
     const mapped = data
       .map((item, idx) => {
         const brand = (item.brand || "").trim();
@@ -436,11 +490,7 @@ export default function SellPhone() {
       })
       .filter(Boolean) as Phone[];
 
-    if (!dedupe) return mapped;
-
-    return uniqByKey(mapped, (p) =>
-      `${p.brand.toLowerCase()}|${p.name.toLowerCase()}|${p.variant ?? ""}`
-    );
+    return mapped;
   };
 
   const sortPhones = (phones: Phone[]) => {
@@ -630,9 +680,10 @@ export default function SellPhone() {
       const data = await fetchPhonesByQuery(searchQuery);
       // Search-by-name should show ALL matching phones/variants from the backend.
       const mapped = mapBackendPhones(data, { dedupe: false });
-      setFilteredPhones(mapped);
+      const relevant = filterPhonesForQuery(mapped, searchQuery);
+      setFilteredPhones(relevant);
 
-      if (mapped.length === 0) {
+      if (relevant.length === 0) {
         setSearchError(
           `No phones matched “${searchQuery.trim()}”. Try a different keyword (e.g., brand + model).`
         );
@@ -775,11 +826,11 @@ export default function SellPhone() {
               </TabsList>
 
               <TabsContent value="popular" className="mt-6">
-                {isDefaultLoading || isSearching ? (
+                {isSearching || (isDefaultLoading && !searchQuery.trim()) ? (
                   <div className="text-center text-gray-600 py-10">
                     Loading phones...
                   </div>
-                ) : defaultError ? (
+                ) : defaultError && !searchQuery.trim() ? (
                   <div className="text-center text-red-600 py-10">
                     {defaultError}
                   </div>
