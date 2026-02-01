@@ -947,7 +947,7 @@ export default function PhoneDetail() {
                         </p>
                         {apiPrice !== null ? (
                           <p className="text-sm font-semibold text-blue-600 mt-1">
-                            AI Quote: ₹{formatPrice(apiPrice)}
+                            AI Quote: {isLoggedIn ? `₹${formatPrice(apiPrice)}` : "₹XXX"}
                           </p>
                         ) : null}
                       </div>
@@ -1351,7 +1351,9 @@ export default function PhoneDetail() {
                           <p className="text-4xl font-bold">Calculating...</p>
                         </div>
                       ) : apiPrice !== null ? (
-                        <p className="text-6xl font-bold mb-4">₹{formatPrice(apiPrice)}</p>
+                        <p className="text-6xl font-bold mb-4">
+                          {isLoggedIn ? `₹${formatPrice(apiPrice)}` : "₹XXX"}
+                        </p>
                       ) : (
                         <p className="text-2xl font-semibold mb-4 text-white/90">
                           Waiting for AI quote...
@@ -1381,8 +1383,9 @@ export default function PhoneDetail() {
                         <div className="flex justify-between text-sm pb-3 border-b">
                           <span className="text-gray-600">Model Base</span>
                           <span className="font-semibold">
-                            ₹
-                            {formatPrice(apiBasePrice ?? effectiveBasePrice)}
+                            {isLoggedIn
+                              ? `₹${formatPrice(apiBasePrice ?? effectiveBasePrice)}`
+                              : "₹XXX"}
                           </span>
                         </div>
                         {apiLogs.length > 0
@@ -1405,7 +1408,11 @@ export default function PhoneDetail() {
                         <div className="pt-3 mt-3 border-t border-gray-200 flex justify-between font-bold">
                           <span>AI Quote</span>
                           <span className="text-blue-600">
-                            {apiPrice !== null ? `₹${formatPrice(apiPrice)}` : "—"}
+                            {apiPrice !== null
+                              ? isLoggedIn
+                                ? `₹${formatPrice(apiPrice)}`
+                                : "₹XXX"
+                              : "—"}
                           </span>
                         </div>
                       </div>
