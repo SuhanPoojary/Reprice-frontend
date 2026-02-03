@@ -181,10 +181,14 @@ export default function Checkout() {
     setIsCheckingServiceability(true);
 
     try {
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+
       const res = await fetch(
         `${API_URL}/orders/serviceability?pincode=${encodeURIComponent(form.pincode || "")}`,
         {
           method: "GET",
+          headers,
         }
       );
 

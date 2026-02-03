@@ -114,7 +114,12 @@ function filterPhonesForQuery(phones: Phone[], query: string) {
   const scored: Array<{ score: number; phone: Phone }> = [];
 
   for (const phone of phones) {
-    const full = normalizeText(`${phone.brand} ${phone.name} ${phone.variant ?? ""}`);
+    const variantsText = Array.isArray(phone.variants)
+      ? phone.variants.map((v) => v?.variant ?? "").join(" ")
+      : "";
+    const full = normalizeText(
+      `${phone.brand} ${phone.name} ${phone.variant ?? ""} ${variantsText}`
+    );
     if (!full) continue;
 
     const tokenMatches = tokens.reduce((acc, t) => acc + (full.includes(t) ? 1 : 0), 0);
@@ -678,8 +683,8 @@ export default function SellPhone() {
 
     try {
       const data = await fetchPhonesByQuery(searchQuery);
-      // Search-by-name should show ALL matching phones/variants from the backend.
-      const mapped = mapBackendPhones(data, { dedupe: false });
+      // Show a single card per (brand, model) while keeping variants inside the card.
+      const mapped = mapBackendPhones(data, { dedupe: true });
       const relevant = filterPhonesForQuery(mapped, searchQuery);
       setFilteredPhones(relevant);
 
@@ -697,30 +702,30 @@ export default function SellPhone() {
     }
   };
 
-    const loadBrandPhones = async (brand: BrandItem) => {
-      setSelectedBrand(brand);
+  const loadBrandPhones = async (brand: BrandItem) => {
+    setSelectedBrand(brand);
+    setBrandPhones([]);
+    setBrandPhonesError("");
+    setIsBrandPhonesLoading(true);
+
+    try {
+      const data = await fetchPhonesByQuery(brand.name);
+      // Brand view: single card per model; variants stay grouped.
+      const mapped = mapBackendPhones(data, { dedupe: true });
+
+      const exact = mapped.filter(
+        (p) => p.brand.trim().toLowerCase() === brand.name.trim().toLowerCase()
+      );
+
+      setBrandPhones(exact.length > 0 ? exact : mapped);
+    } catch (e) {
+      console.error("Failed to load brand phones", e);
       setBrandPhones([]);
-      setBrandPhonesError("");
-      setIsBrandPhonesLoading(true);
-
-      try {
-        const data = await fetchPhonesByQuery(brand.name);
-        // Brand view should show ALL phones for that brand.
-        const mapped = mapBackendPhones(data, { dedupe: false });
-
-        const exact = mapped.filter(
-          (p) => p.brand.trim().toLowerCase() === brand.name.trim().toLowerCase()
-        );
-
-        setBrandPhones(exact.length > 0 ? exact : mapped);
-      } catch (e) {
-        console.error("Failed to load brand phones", e);
-        setBrandPhones([]);
-        setBrandPhonesError("Brand phones could not be loaded.");
-      } finally {
-        setIsBrandPhonesLoading(false);
-      }
-    };
+      setBrandPhonesError("Brand phones could not be loaded.");
+    } finally {
+      setIsBrandPhonesLoading(false);
+    }
+  };
 
   const sortedFilteredPhones = useMemo(
     () => sortPhones(filteredPhones),
