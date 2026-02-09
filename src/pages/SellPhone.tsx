@@ -892,7 +892,7 @@ export default function SellPhone() {
                                 <div className="pt-2">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-lg font-bold text-gray-900">
-                                      ₹{phone.maxPrice.toLocaleString()}
+                                      ₹{isLoggedIn ? phone.maxPrice.toLocaleString() : "XXX.XX"}
                                     </p>
                                     <Button
                                       size="sm"
@@ -981,7 +981,7 @@ export default function SellPhone() {
                                     <div className="pt-2">
                                       <div className="flex items-center justify-between gap-2">
                                         <p className="text-lg font-bold text-gray-900">
-                                          ₹{phone.maxPrice.toLocaleString()}
+                                          ₹{isLoggedIn ? phone.maxPrice.toLocaleString() : "XXX.XX"}
                                         </p>
                                         <Button
                                           size="sm"

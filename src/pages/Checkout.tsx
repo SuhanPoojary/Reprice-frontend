@@ -149,7 +149,7 @@ export default function Checkout() {
                       <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                         <div className="text-sm text-emerald-700 font-medium">AI Quote</div>
                         <div className="text-3xl font-extrabold text-emerald-700 mt-1">
-                          ₹XXX
+                          ₹XXX.XX
                         </div>
                       </div>
                     </div>
