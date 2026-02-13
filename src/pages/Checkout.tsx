@@ -44,12 +44,14 @@ import { API_URL } from "@/api/config";
 export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, isLoggedIn } = useAuth(); 
+  const { token, isLoggedIn, logout } = useAuth(); 
   const [paymentMethod, setPaymentMethod] = useState("upi");
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingServiceability, setIsCheckingServiceability] = useState(false);
   const [timeSlot, setTimeSlot] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitErrorTitle, setSubmitErrorTitle] = useState<string | null>(null);
 
 
   const [form, setForm] = useState({
@@ -147,7 +149,7 @@ export default function Checkout() {
                       <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                         <div className="text-sm text-emerald-700 font-medium">AI Quote</div>
                         <div className="text-3xl font-extrabold text-emerald-700 mt-1">
-                          ₹{Number(phoneData.price || 0).toLocaleString()}
+                          ₹XXX.XX
                         </div>
                       </div>
                     </div>
@@ -172,10 +174,85 @@ export default function Checkout() {
     );
   }
 
-  const handleSubmitAddress = (e: React.FormEvent) => {
+  const handleSubmitAddress = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep(2);
-    window.scrollTo(0, 0);
+    setSubmitError(null);
+    setSubmitErrorTitle(null);
+    setIsCheckingServiceability(true);
+
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(
+        `${API_URL}/orders/serviceability?pincode=${encodeURIComponent(form.pincode || "")}`,
+        {
+          method: "GET",
+          headers,
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      // This endpoint should be PUBLIC. If we get 401/403 here, the backend is likely
+      // routing /orders/serviceability to a protected handler (e.g., /orders/:id) or
+      // is otherwise misconfigured.
+      if (res.status === 401 || res.status === 403) {
+        const backendMsg = String(data?.message || "");
+        throw new Error(
+          backendMsg && backendMsg.length > 0
+            ? `Serviceability check is not accessible on the backend: ${backendMsg}`
+            : "Serviceability check is not accessible on the backend. Please redeploy the backend and try again."
+        );
+      }
+
+      // We want the user to know serviceability BEFORE moving to Payment.
+      // So if the endpoint is missing (404) or backend is failing (5xx/503), we block step-advance.
+      if (res.status === 404) {
+        throw new Error(
+          "Serviceability check endpoint is not available on the backend yet. Please redeploy the backend (or point VITE_API_URL to the updated server) and try again."
+        );
+      }
+
+      if (res.status === 503 || res.status >= 500) {
+        throw new Error(
+          "Serviceability check is temporarily unavailable. Please try again in a moment."
+        );
+      }
+
+      if (!res.ok || !data?.success) {
+        const msg = String(data?.message || "Order not serviceable. Change your pincode.");
+        throw new Error(msg);
+      }
+
+      setStep(2);
+      window.scrollTo(0, 0);
+    } catch (err: any) {
+      const rawMsg = String(err?.message || "");
+      const isNetworkError =
+        err?.name === "TypeError" ||
+        /failed\s+to\s+fetch/i.test(rawMsg) ||
+        /network\s*error/i.test(rawMsg) ||
+        /err_connection_refused/i.test(rawMsg);
+
+      const isServiceabilityInfra =
+        /serviceability\s+check/i.test(rawMsg) || /redeploy\s+the\s+backend/i.test(rawMsg);
+
+      const title = isNetworkError
+        ? "Backend not reachable"
+        : isServiceabilityInfra
+          ? "Serviceability check failed"
+          : "Order not serviceable";
+      const msg = isNetworkError
+        ? "Can’t reach the backend API. Please start the backend or set VITE_API_URL to the correct server, then reload the page."
+        : rawMsg || "Order not serviceable. Change your pincode.";
+
+      setSubmitErrorTitle(title);
+      setSubmitError(msg);
+      toast.error(title, { description: msg });
+    } finally {
+      setIsCheckingServiceability(false);
+    }
   };
 
   const handleSubmitPayment = async (e: React.FormEvent) => {
@@ -208,8 +285,7 @@ export default function Checkout() {
         let message = String(data?.message || "Order failed. Please try again.");
 
         if (res.status === 422 && (data?.code === "NOT_SERVICEABLE" || /not\s+servic/i.test(message))) {
-          message =
-            "Sorry — we don’t service this PIN code yet. Try a nearby PIN code or change your pickup address.";
+          message = "Order not serviceable. Change your pincode.";
         }
 
         if (res.status === 400 && data?.code === "INVALID_PINCODE") {
@@ -331,6 +407,13 @@ console.log("CHECKOUT STATE:", location.state);
                       onSubmit={handleSubmitAddress}
                       className="p-6 space-y-5"
                     >
+                      {submitError && (
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
+                          <div className="font-semibold">{submitErrorTitle || "Order not serviceable"}</div>
+                          <div className="text-sm mt-1">{submitError}</div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label
@@ -466,7 +549,13 @@ console.log("CHECKOUT STATE:", location.state);
                             required
                             className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                             placeholder="400001"
-                            onChange={(e) => setForm({ ...form, pincode: e.target.value })}
+                            onChange={(e) => {
+                              setForm({ ...form, pincode: e.target.value });
+                              if (submitError) {
+                                setSubmitError(null);
+                                setSubmitErrorTitle(null);
+                              }
+                            }}
                           />
                         </div>
                       </div>
@@ -525,6 +614,7 @@ console.log("CHECKOUT STATE:", location.state);
                       <div className="pt-4 space-y-3">
                         <Button
                           type="submit"
+                          disabled={isCheckingServiceability}
                           className="w-full h-12 text-base bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/30"
                         >
                           Continue to Payment

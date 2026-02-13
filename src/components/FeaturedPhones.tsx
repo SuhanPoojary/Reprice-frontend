@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 // Mock data for featured phones
 const FEATURED_PHONES = [
@@ -57,6 +58,8 @@ const FEATURED_PHONES = [
 ];
 
 export function FeaturedPhones() {
+	const { isLoggedIn } = useAuth();
+
 	return (
 		<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
 			{FEATURED_PHONES.map((phone) => (
@@ -107,7 +110,7 @@ export function FeaturedPhones() {
 								<div className="flex items-center justify-between gap-3">
 									<div>
 										<p className="text-2xl font-bold text-gray-900">
-											₹ {phone.maxPrice.toLocaleString()}
+											₹ {isLoggedIn ? phone.maxPrice.toLocaleString() : "XXX.XX"}
 										</p>
 									</div>
 									<Button

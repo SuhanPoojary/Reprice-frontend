@@ -40,9 +40,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const allowMockAuth = Boolean(
+    (import.meta as any).env?.VITE_ALLOW_MOCK_AUTH === "true"
+  );
+
   useEffect(() => {
     const savedUser = localStorage.getItem("currentUser");
     const savedToken = localStorage.getItem("token");
+
+    // Never restore mock tokens (they will be rejected by the real backend).
+    if (savedToken && /^mock-/i.test(savedToken)) {
+      localStorage.removeItem("currentUser");
+      localStorage.removeItem("token");
+      setIsLoading(false);
+      return;
+    }
 
     if (savedToken) {
       setToken(savedToken);
@@ -97,8 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return false;
     } catch (error) {
-      console.warn("Backend not available, using mock authentication:", error);
+      console.warn("Login failed:", error);
 
+      if (!allowMockAuth) return false;
+
+      console.warn("Backend not available, using mock authentication:", error);
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       if (phone && password.length >= 4) {
@@ -109,12 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: "customer",
         };
 
-        const mockToken = `mock-token-${Date.now()}`; // ✅ ADDED
+        const mockToken = `mock-token-${Date.now()}`;
 
         setUser(mockUser);
-        setToken(mockToken); // ✅ ADDED
+        setToken(mockToken);
         localStorage.setItem("currentUser", JSON.stringify(mockUser));
-        localStorage.setItem("token", mockToken); // ✅ ADDED
+        localStorage.setItem("token", mockToken);
 
         return true;
       }
@@ -169,8 +184,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return false;
     } catch (error) {
-      console.warn("Backend not available, using mock Google authentication:", error);
+      console.warn("Google login failed:", error);
 
+      if (!allowMockAuth) return false;
+
+      console.warn("Backend not available, using mock Google authentication:", error);
       await new Promise((resolve) => setTimeout(resolve, 700));
 
       if (credential && credential.length > 20) {
@@ -234,8 +252,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return false;
     } catch (error) {
-      console.warn("Backend not available, using mock signup:", error);
+      console.warn("Signup failed:", error);
 
+      if (!allowMockAuth) return false;
+
+      console.warn("Backend not available, using mock signup:", error);
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       if (name && phone && password.length >= 4) {
@@ -247,12 +268,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: "customer",
         };
 
-        const mockToken = `mock-token-${Date.now()}`; // ✅ ADDED
+        const mockToken = `mock-token-${Date.now()}`;
 
         setUser(mockUser);
-        setToken(mockToken); // ✅ ADDED
+        setToken(mockToken);
         localStorage.setItem("currentUser", JSON.stringify(mockUser));
-        localStorage.setItem("token", mockToken); // ✅ ADDED
+        localStorage.setItem("token", mockToken);
 
         return true;
       }

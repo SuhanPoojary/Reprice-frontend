@@ -148,6 +148,10 @@ export default function PhoneDetail() {
   const { isLoggedIn } = useAuth();
   const passedPhone = location.state?.phoneData;
 
+  const formatPriceMasked = (value: number | null | undefined): string => {
+    return isLoggedIn ? formatPrice(value) : "XXX.XX";
+  };
+
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
   const [selectedVariantKey, setSelectedVariantKey] = useState<string>("");
   const [isVariantLoading, setIsVariantLoading] = useState(false);
@@ -758,7 +762,7 @@ export default function PhoneDetail() {
         reasons.push(`✓ Excellent screen condition maintains full value`);
       } else {
         reasons.push(
-          `• Screen condition (${screenOption.name}) reduces value by ₹${formatPrice(Math.abs(screenOption.priceAdjustment))}`
+          `• Screen condition (${screenOption.name}) reduces value by ₹${formatPriceMasked(Math.abs(screenOption.priceAdjustment))}`
         );
       }
     }
@@ -766,7 +770,9 @@ export default function PhoneDetail() {
       reasons.push(`✓ Device powers on properly (better resale value)`);
     } else if (deviceTurnsOn === "no") {
       reasons.push(
-        `• Device not turning on significantly reduces value by ₹8,000`
+        `• Device not turning on significantly reduces value by ${
+          isLoggedIn ? "₹8,000" : "₹XXX.XX"
+        }`
       );
     }
     if (hasOriginalBox === "yes") {
@@ -947,7 +953,7 @@ export default function PhoneDetail() {
                         </p>
                         {apiPrice !== null ? (
                           <p className="text-sm font-semibold text-blue-600 mt-1">
-                            AI Quote: ₹{formatPrice(apiPrice)}
+                            AI Quote: {`₹${formatPriceMasked(apiPrice)}`}
                           </p>
                         ) : null}
                       </div>
@@ -1109,7 +1115,7 @@ export default function PhoneDetail() {
                                       className="flex items-center justify-between gap-3 border-2 rounded-2xl p-4 cursor-pointer peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 hover:bg-white/80 bg-white/60 backdrop-blur transition-all"
                                     >
                                       <span className="font-semibold">{variantLabel(o)}</span>
-                                      <span className="text-sm text-gray-600">₹{formatPrice(o.price)}</span>
+                                      <span className="text-sm text-gray-600">₹{formatPriceMasked(o.price)}</span>
                                     </Label>
                                   </div>
                                 ))}
@@ -1118,7 +1124,7 @@ export default function PhoneDetail() {
                           ) : null}
 
                           <div className="text-xs text-gray-500">
-                            Base price for selected variant: ₹{formatPrice(effectiveBasePrice)}
+                            Base price for selected variant: ₹{formatPriceMasked(effectiveBasePrice)}
                           </div>
                         </div>
                       ) : (
@@ -1351,7 +1357,9 @@ export default function PhoneDetail() {
                           <p className="text-4xl font-bold">Calculating...</p>
                         </div>
                       ) : apiPrice !== null ? (
-                        <p className="text-6xl font-bold mb-4">₹{formatPrice(apiPrice)}</p>
+                        <p className="text-6xl font-bold mb-4">
+                          {`₹${formatPriceMasked(apiPrice)}`}
+                        </p>
                       ) : (
                         <p className="text-2xl font-semibold mb-4 text-white/90">
                           Waiting for AI quote...
@@ -1381,8 +1389,7 @@ export default function PhoneDetail() {
                         <div className="flex justify-between text-sm pb-3 border-b">
                           <span className="text-gray-600">Model Base</span>
                           <span className="font-semibold">
-                            ₹
-                            {formatPrice(apiBasePrice ?? effectiveBasePrice)}
+                            {`₹${formatPriceMasked(apiBasePrice ?? effectiveBasePrice)}`}
                           </span>
                         </div>
                         {apiLogs.length > 0
@@ -1405,7 +1412,7 @@ export default function PhoneDetail() {
                         <div className="pt-3 mt-3 border-t border-gray-200 flex justify-between font-bold">
                           <span>AI Quote</span>
                           <span className="text-blue-600">
-                            {apiPrice !== null ? `₹${formatPrice(apiPrice)}` : "—"}
+                            {apiPrice !== null ? `₹${formatPriceMasked(apiPrice)}` : "—"}
                           </span>
                         </div>
                       </div>
