@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Accordion,
   AccordionContent,
@@ -53,14 +52,29 @@ export default function Checkout() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorTitle, setSubmitErrorTitle] = useState<string | null>(null);
 
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+
 
   const [form, setForm] = useState({
-    address: "",
+    house: "",
+    street: "",
+    landmark: "",
     city: "",
     state: "",
     pincode: "",
     pickupDate: "",
   });
+
+  const composedAddress = [
+    form.house,
+    form.street,
+    form.landmark,
+  ]
+    .map((x) => String(x || "").trim())
+    .filter(Boolean)
+    .join(", ");
 
   // Use phoneData from location.state if available, else fallback
   const locationState = location.state as any;
@@ -268,10 +282,12 @@ export default function Checkout() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          address: form.address,
+          address: composedAddress,
           city: form.city,
           state: form.state,
           pincode: form.pincode,
+          latitude: gpsCoords?.lat ?? null,
+          longitude: gpsCoords?.lng ?? null,
           phone: phoneData,
           pickupDate: form.pickupDate,
           timeSlot,  
@@ -310,6 +326,62 @@ export default function Checkout() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleUseLiveLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      const msg = "Live location is not supported on this browser.";
+      setGpsStatus(msg);
+      toast.error("Live location unavailable", { description: msg });
+      return;
+    }
+
+    setIsLocating(true);
+    setGpsStatus("Requesting location permission…");
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos?.coords?.latitude);
+        const lng = Number(pos?.coords?.longitude);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          const msg = "Couldn’t read a valid location from the device.";
+          setGpsCoords(null);
+          setGpsStatus(msg);
+          toast.error("Location capture failed", { description: msg });
+          setIsLocating(false);
+          return;
+        }
+
+        setGpsCoords({ lat, lng });
+        setGpsStatus("Live location captured.");
+        toast.success("Live location captured", {
+          description: "We’ll use this as the pickup coordinates.",
+        });
+        setIsLocating(false);
+      },
+      (err) => {
+        const code = Number(err?.code ?? 0);
+        const msg =
+          code === 1
+            ? "Permission denied. Please allow location access and try again."
+            : code === 2
+              ? "Location unavailable. Try again with GPS enabled."
+              : code === 3
+                ? "Location request timed out. Please try again."
+                : "Couldn’t get your live location. Please try again.";
+
+        setGpsCoords(null);
+        setGpsStatus(msg);
+        toast.error("Location capture failed", { description: msg });
+        setIsLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
   };
 
   // After placing an order, redirect back to Sell Phone page.
@@ -477,19 +549,80 @@ console.log("CHECKOUT STATE:", location.state);
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="house"
+                            className="text-gray-700 font-medium"
+                          >
+                            House / Flat No.
+                          </Label>
+                          <Input
+                            id="house"
+                            required
+                            className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="A-5"
+                            value={form.house}
+                            onChange={(e) => setForm({ ...form, house: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="street"
+                            className="text-gray-700 font-medium"
+                          >
+                            Street
+                          </Label>
+                          <Input
+                            id="street"
+                            required
+                            className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="Eduljee Road, Charai"
+                            value={form.street}
+                            onChange={(e) => setForm({ ...form, street: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-gray-700 font-medium">Live Location</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11 w-full"
+                            onClick={handleUseLiveLocation}
+                            disabled={isLocating}
+                          >
+                            {isLocating ? "Getting location…" : "Use Live Location"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-gray-600">
+                        {gpsCoords ? (
+                          <span>
+                            {gpsStatus ? `${gpsStatus} ` : ""}({gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)})
+                          </span>
+                        ) : gpsStatus ? (
+                          <span>{gpsStatus}</span>
+                        ) : (
+                          <span>Optional: capture your exact pickup coordinates.</span>
+                        )}
+                      </div>
+
                       <div className="space-y-2">
                         <Label
-                          htmlFor="address"
+                          htmlFor="landmark"
                           className="text-gray-700 font-medium"
                         >
-                          Full Address
+                          Landmark
                         </Label>
-                        <Textarea
-                          id="address"
-                          required
-                          className="min-h-[80px] border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                          placeholder="House/Flat No., Street, Landmark..."
-                          onChange={(e) => setForm({ ...form, address: e.target.value })}
+                        <Input
+                          id="landmark"
+                          className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="Near Ganesh Bhavan"
+                          value={form.landmark}
+                          onChange={(e) => setForm({ ...form, landmark: e.target.value })}
                         />
                       </div>
 
@@ -506,6 +639,7 @@ console.log("CHECKOUT STATE:", location.state);
                             required
                             className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                             placeholder="Mumbai"
+                            value={form.city}
                             onChange={(e) => setForm({ ...form, city: e.target.value })}
                           />
                         </div>
@@ -516,7 +650,7 @@ console.log("CHECKOUT STATE:", location.state);
                           >
                             State
                           </Label>
-                          <Select>
+                          <Select value={form.state} onValueChange={(v) => setForm({ ...form, state: v })}>
                             <SelectTrigger
                               id="state"
                               className="h-11 border-gray-200"
@@ -524,14 +658,14 @@ console.log("CHECKOUT STATE:", location.state);
                               <SelectValue placeholder="Select state" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="maharashtra">
+                              <SelectItem value="Maharashtra">
                                 Maharashtra
                               </SelectItem>
-                              <SelectItem value="delhi">Delhi</SelectItem>
-                              <SelectItem value="karnataka">
+                              <SelectItem value="Delhi">Delhi</SelectItem>
+                              <SelectItem value="Karnataka">
                                 Karnataka
                               </SelectItem>
-                              <SelectItem value="tamil-nadu">
+                              <SelectItem value="Tamil Nadu">
                                 Tamil Nadu
                               </SelectItem>
                             </SelectContent>
@@ -549,6 +683,7 @@ console.log("CHECKOUT STATE:", location.state);
                             required
                             className="h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                             placeholder="400001"
+                            value={form.pincode}
                             onChange={(e) => {
                               setForm({ ...form, pincode: e.target.value });
                               if (submitError) {
@@ -559,6 +694,7 @@ console.log("CHECKOUT STATE:", location.state);
                           />
                         </div>
                       </div>
+
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
