@@ -56,6 +56,22 @@ export default function Checkout() {
   const [gpsStatus, setGpsStatus] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
+  const getErrorMessage = (err: unknown) => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "string") return err;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  };
+
+  const asString = (v: unknown, fallback = "") => (typeof v === "string" ? v : v == null ? fallback : String(v));
+  const asNumber = (v: unknown): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
 
   const [form, setForm] = useState({
     house: "",
@@ -76,30 +92,38 @@ export default function Checkout() {
     .filter(Boolean)
     .join(", ");
 
+  // After placing an order, redirect back to Sell Phone page.
+  // Must not be conditional (React hooks rule).
+  useEffect(() => {
+    if (step !== 3) return;
+
+    const t = window.setTimeout(() => {
+      navigate("/sell", { replace: true });
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [step, navigate]);
+
   // Use phoneData from location.state if available, else fallback
-  const locationState = location.state as any;
+  const locationState = location.state as { phoneData?: Record<string, unknown> } | null;
+  const passedPhoneData = locationState?.phoneData;
 
- const passedPhoneData = locationState?.phoneData;
-
- const phoneData = passedPhoneData
-  ? {
-      id: passedPhoneData.id,
-      name: passedPhoneData.name,
-      brand: passedPhoneData.brand,
-      variant: passedPhoneData.variant ?? "N/A",
-      condition: passedPhoneData.condition ?? "Good",
-      price:
-        passedPhoneData.price ??
-        passedPhoneData.maxPrice ??
-        0,
-      image:
-        passedPhoneData.image && passedPhoneData.image.trim() !== ""
-          ? passedPhoneData.image
-          : `https://placehold.co/200x200?text=${encodeURIComponent(
-              passedPhoneData.name
-            )}`,
-    }
-  : {
+  const phoneData = passedPhoneData
+    ? {
+        id: asString(passedPhoneData.id, ""),
+        name: asString(passedPhoneData.name, ""),
+        brand: asString(passedPhoneData.brand, ""),
+        variant: asString(passedPhoneData.variant, "N/A") || "N/A",
+        condition: asString(passedPhoneData.condition, "Good") || "Good",
+        price: asNumber(passedPhoneData.price) ?? asNumber(passedPhoneData.maxPrice) ?? 0,
+        image:
+          asString(passedPhoneData.image, "").trim() !== ""
+            ? asString(passedPhoneData.image, "")
+            : `https://placehold.co/200x200?text=${encodeURIComponent(asString(passedPhoneData.name, "Phone"))}`,
+      }
+    : {
       // fallback ONLY if navigation state is missing
       id: "iphone-13-pro",
       name: "iPhone 13 Pro",
@@ -241,10 +265,10 @@ export default function Checkout() {
 
       setStep(2);
       window.scrollTo(0, 0);
-    } catch (err: any) {
-      const rawMsg = String(err?.message || "");
+    } catch (err: unknown) {
+      const rawMsg = getErrorMessage(err);
       const isNetworkError =
-        err?.name === "TypeError" ||
+        (err instanceof Error && err.name === "TypeError") ||
         /failed\s+to\s+fetch/i.test(rawMsg) ||
         /network\s*error/i.test(rawMsg) ||
         /err_connection_refused/i.test(rawMsg);
@@ -317,10 +341,10 @@ export default function Checkout() {
         description: "Redirecting you to Sell Phone…",
       });
       navigate("/sell", { replace: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Checkout error:", err);
 
-      const msg = String(err?.message || "Order failed");
+      const msg = getErrorMessage(err) || "Order failed";
       setSubmitError(msg);
       toast.error("Couldn’t place the order", { description: msg });
     } finally {
@@ -354,11 +378,51 @@ export default function Checkout() {
         }
 
         setGpsCoords({ lat, lng });
-        setGpsStatus("Live location captured.");
-        toast.success("Live location captured", {
-          description: "We’ll use this as the pickup coordinates.",
-        });
-        setIsLocating(false);
+        setGpsStatus("Live location captured. Filling address…");
+
+        (async () => {
+          try {
+            if (!token) {
+              setGpsStatus("Live location captured. Please log in again.");
+              return;
+            }
+
+            const res = await fetch(
+              `${API_URL}/orders/reverse-geocode?lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}`,
+              {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.success) {
+              const msg = String(data?.message || "Couldn’t fill address from live location.");
+              setGpsStatus(`Live location captured. ${msg}`);
+              return;
+            }
+
+            const addr = data?.address || {};
+            setForm((prev) => ({
+              ...prev,
+              street: String(addr.street || prev.street || ""),
+              city: String(addr.city || prev.city || ""),
+              state: String(addr.state || prev.state || ""),
+              pincode: String(addr.pincode || prev.pincode || ""),
+            }));
+
+            setGpsStatus("Live location captured. Address filled.");
+            toast.success("Address filled from location", {
+              description: "Street, city, state, and PIN were updated.",
+            });
+          } catch (e: unknown) {
+            setGpsStatus("Live location captured. Couldn’t fill address from location.");
+          } finally {
+            setIsLocating(false);
+          }
+        })();
       },
       (err) => {
         const code = Number(err?.code ?? 0);
@@ -383,21 +447,6 @@ export default function Checkout() {
       }
     );
   };
-
-  // After placing an order, redirect back to Sell Phone page.
-  useEffect(() => {
-    if (step !== 3) return;
-
-    const t = window.setTimeout(() => {
-      navigate("/sell", { replace: true });
-    }, 1500);
-
-    return () => {
-      window.clearTimeout(t);
-    };
-  }, [step, navigate]);
-
-console.log("CHECKOUT STATE:", location.state);
 
 
   const stepIcons = [
@@ -548,6 +597,31 @@ console.log("CHECKOUT STATE:", location.state);
                           />
                         </div>
                       </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                          <Label className="text-gray-700 font-medium">Live Location</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11 w-full"
+                            onClick={handleUseLiveLocation}
+                            disabled={isLocating}
+                          >
+                            {isLocating ? "Getting location…" : "Use Live Location"}
+                          </Button>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {gpsCoords ? (
+                          <span>
+                            {gpsStatus ? `${gpsStatus} ` : ""}({gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)})
+                          </span>
+                        ) : gpsStatus ? (
+                          <span>{gpsStatus}</span>
+                        ) : (
+                          <span>Optional: capture your exact pickup coordinates.</span>
+                        )}
+                      </div>
+                      </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                         <div className="space-y-2">
@@ -585,32 +659,6 @@ console.log("CHECKOUT STATE:", location.state);
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-gray-700 font-medium">Live Location</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 w-full"
-                            onClick={handleUseLiveLocation}
-                            disabled={isLocating}
-                          >
-                            {isLocating ? "Getting location…" : "Use Live Location"}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="text-sm text-gray-600">
-                        {gpsCoords ? (
-                          <span>
-                            {gpsStatus ? `${gpsStatus} ` : ""}({gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)})
-                          </span>
-                        ) : gpsStatus ? (
-                          <span>{gpsStatus}</span>
-                        ) : (
-                          <span>Optional: capture your exact pickup coordinates.</span>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
                         <Label
                           htmlFor="landmark"
                           className="text-gray-700 font-medium"
@@ -625,6 +673,7 @@ console.log("CHECKOUT STATE:", location.state);
                           onChange={(e) => setForm({ ...form, landmark: e.target.value })}
                         />
                       </div>
+                      </div>                      
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="space-y-2">
